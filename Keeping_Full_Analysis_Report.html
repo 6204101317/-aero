@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ระบบเรียกเก็บเงินสหกรณ์ (Keeping) — รายงานวิเคราะห์ฉบับเต็ม</title>
+<style>
+  :root {
+    --core: #2563eb; --aero: #ea580c; --ink: #1e293b; --muted: #64748b;
+    --border: #e2e8f0; --bg-alt: #f8fafc; --hdr: #1e3a5f; --accent: #eef2ff;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: "Tahoma", "Segoe UI", "Noto Sans Thai", sans-serif; margin: 0; color: var(--ink); background: #fff; line-height: 1.6; }
+  header.top { background: linear-gradient(135deg, #1e3a5f, #2563eb); color: #fff; padding: 40px 24px; }
+  header.top h1 { margin: 0 0 8px; font-size: 28px; }
+  header.top p { margin: 0; opacity: .9; font-size: 15px; }
+  .layout { display: flex; max-width: 1400px; margin: 0 auto; }
+  nav.toc { width: 260px; flex-shrink: 0; position: sticky; top: 0; align-self: flex-start; max-height: 100vh; overflow-y: auto; padding: 24px 16px; border-right: 1px solid var(--border); font-size: 14px; }
+  nav.toc a { display: block; padding: 6px 8px; color: var(--ink); text-decoration: none; border-radius: 6px; }
+  nav.toc a:hover { background: var(--accent); }
+  nav.toc .sub a { padding-left: 20px; font-size: 13px; color: var(--muted); }
+  main { flex: 1; padding: 32px 40px; min-width: 0; }
+  section { margin-bottom: 56px; scroll-margin-top: 16px; }
+  h2 { font-size: 22px; border-bottom: 2px solid var(--hdr); padding-bottom: 8px; color: var(--hdr); }
+  h3 { font-size: 17px; color: var(--hdr); margin-top: 28px; }
+  h4 { font-size: 15px; color: #334155; }
+  p.lead { color: var(--muted); font-size: 14px; }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0 24px; font-size: 13.5px; }
+  th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--hdr); color: #fff; font-weight: 600; }
+  tr:nth-child(even) td { background: var(--bg-alt); }
+  code { background: #f1f5f9; padding: 1px 5px; border-radius: 4px; font-family: Consolas, monospace; font-size: 13px; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; color: #fff; }
+  .badge.core { background: var(--core); }
+  .badge.aero { background: var(--aero); }
+  .rule-box { background: var(--accent); border: 1px solid #c7d2fe; border-radius: 8px; padding: 16px 20px; margin: 14px 0; }
+  .obj-card { border: 1px solid var(--border); border-radius: 8px; padding: 18px 20px; margin-bottom: 16px; background: #fff; }
+  .obj-card .trigger { color: var(--hdr); font-weight: 600; margin-bottom: 10px; }
+  .obj-card ol { margin: 8px 0; padding-left: 22px; }
+  .obj-card li { margin-bottom: 4px; font-size: 13.5px; }
+  .obj-card .outcome { margin-top: 10px; padding: 10px 14px; background: var(--bg-alt); border-left: 3px solid var(--hdr); font-size: 13.5px; color: #334155; }
+  .swimlane-wrap { text-align: center; margin: 20px 0; }
+  .swimlane-wrap svg { max-width: 100%; height: auto; border: 1px solid var(--border); border-radius: 8px; }
+  .note { font-size: 13px; color: var(--muted); font-style: italic; }
+  .search-box { margin: 10px 0 16px; }
+  .search-box input { width: 100%; max-width: 420px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; }
+  .filecard { display: inline-flex; gap: 10px; align-items: center; background: var(--bg-alt); border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; margin: 4px 8px 4px 0; font-size: 13px; }
+  footer { padding: 24px 40px; color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--border); }
+  @media (max-width: 900px) {
+    .layout { flex-direction: column; }
+    nav.toc { position: static; width: 100%; max-height: none; border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <h1>ระบบเรียกเก็บเงินสหกรณ์ (Keeping) — รายงานวิเคราะห์ฉบับเต็ม</h1>
+  <p>รวมผลการวิเคราะห์ทั้งหมด: เปรียบเทียบ CORE / AERO · สถาปัตยกรรม · PBProcess Job Detail · pckeeping.pbl Function Reference (9 object / 88 function)</p>
+</header>
+
+<div class="layout">
+<nav class="toc">
+  <a href="#overview"><strong>1. ภาพรวมและวิธีการ</strong></a>
+  <a href="#source-rule"><strong>2. กฎการเลือกแหล่งข้อมูล</strong></a>
+  <a href="#swimlane"><strong>3. แผนภาพ Swimlane</strong></a>
+  <a href="#phases"><strong>4. ขั้นตอนการทำงาน (6 เฟส)</strong></a>
+  <a href="#prd"><strong>5. สรุป PRD</strong></a>
+  <div class="sub">
+    <a href="#roles">บทบาทผู้ใช้งาน</a>
+    <a href="#nfr">Non-Functional Req.</a>
+    <a href="#deps">Dependencies</a>
+    <a href="#issues">Open Issues</a>
+  </div>
+  <a href="#pbjobs"><strong>6. PBProcess Job Detail</strong></a>
+  <a href="#pblobjects"><strong>7. pckeeping.pbl — 9 Objects</strong></a>
+  <a href="#pblfuncs"><strong>8. pckeeping.pbl — 88 Functions</strong></a>
+  <a href="#appendix"><strong>9. ภาคผนวก: ตารางเต็ม 37 รายการ</strong></a>
+</nav>
+
+<main>
+
+<section id="overview">
+<h2>1. ภาพรวมและวิธีการ (Overview &amp; Methodology)</h2>
+<p>โมดูล Keeping (เรียกเก็บเงิน) เป็นระบบหักเงินสมาชิกสหกรณ์ประจำงวด ครอบคลุมหุ้น เงินกู้ เงินฝาก เบี้ยประกัน ค่าแรกเข้า และเงินคืน โดยมีทั้งหน้าจอ ASP.NET (.NET WebForms) สำหรับตั้งค่า/ตรวจสอบ/สั่งงาน และเอนจินประมวลผลแบบ batch ฝั่ง PowerBuilder (PBProcess.exe) ที่ทำงานจริงเบื้องหลัง</p>
+<p>ระบบมีซอร์สโค้ดอยู่ 2 โฟลเดอร์คือ <span class="badge core">CORE</span> (เวอร์ชันฐาน) และ <span class="badge aero">AERO</span> (เวอร์ชันที่ถูกปรับแก้เพิ่มเติมสำหรับหน่วยงานนี้) จากทั้งหมด 37 รายการ (window_id) ภายใต้ application = keeping ใน amsecwins: 30 รายการอ่านจาก CORE และ 7 รายการอ่านจาก AERO (พบ 1 รายการ <code>ws_dag_pay_mthdag_memberno</code> ที่ระบุใน amsecwins แต่ไม่พบไฟล์จริงในโฟลเดอร์ทั้งสองฝั่ง — ดู Open Issues)</p>
+<p class="note">หมายเหตุ: runPostProcess (เรียกผ่าน WebUtil.runProcessingCappExtend ที่ ws_kep_check_kptp และ ws_dag_process_mthdag) ไม่ได้วิ่งผ่าน PBProcess.exe แต่วิ่งผ่าน AppProcessing.exe ซึ่งเป็นเอนจิน .NET คนละตัว</p>
+</section>
+
+<section id="source-rule">
+<h2>2. กฎการเลือกแหล่งข้อมูล (Source Resolution Rule)</h2>
+<div class="rule-box">
+  <p style="margin:4px 0;">• <code>core_flag = 1</code> → อ่านจาก <span class="badge core">CORE</span></p>
+  <p style="margin:4px 0;">• <code>core_flag = 0 หรือ 2</code> (อื่นๆ) → อ่านจาก <span class="badge aero">AERO</span></p>
+</div>
+<p class="note">อ้างอิงจากไฟล์ amsecwins (application = "keeping") — เมื่อ object ชื่อเดียวกันมีอยู่ทั้งในโฟลเดอร์ CORE และ AERO ให้ยึดกฎนี้เป็นแหล่งความจริง (source of truth)</p>
+</section>
+
+<section id="swimlane">
+<h2>3. แผนภาพ Swimlane ภาพรวมกระบวนการ</h2>
+<p class="lead">แบ่งกระบวนการออกเป็น 6 เฟส (คอลัมน์) และ 5 บทบาท/ชั้นระบบ (แถว) พร้อมระบุแหล่งที่มาของหน้าจอหลักด้วยสี — น้ำเงิน = CORE, ส้ม = AERO</p>
+<div class="swimlane-wrap">
+<svg viewBox="0 0 1150 900" xmlns="http://www.w3.org/2000/svg" role="img">
+<title>Keeping process swimlane, CORE vs AERO source</title>
+<desc>Swimlane diagram of the cooperative keeping (savings deduction) process across six phases: setup, request/import, adjust/verify, main process, related sub-processes, and post-process, showing which screens come from CORE vs AERO per amsecwins.core_flag.</desc>
+<defs>
+<style>
+text{font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Arial,sans-serif;}
+.title{font-size:19px;font-weight:700;fill:#0f172a;}
+.subtitle{font-size:11.5px;fill:#64748b;}
+.hdr-bg{fill:#eef2ff;stroke:#c7d2fe;stroke-width:1;}
+.hdr-txt{font-size:12px;font-weight:700;fill:#1e293b;text-anchor:middle;}
+.lane-bg{fill:#f1f5f9;stroke:#e2e8f0;stroke-width:1;}
+.lane-txt{font-size:11.5px;font-weight:700;fill:#334155;text-anchor:start;}
+.cell{fill:#ffffff;stroke:#e2e8f0;stroke-width:1;}
+.cell-alt{fill:#f8fafc;stroke:#e2e8f0;stroke-width:1;}
+.c-title{font-size:11px;font-weight:600;fill:#0f172a;text-anchor:middle;}
+.c-sub{font-size:9.5px;fill:#64748b;text-anchor:middle;}
+.c-title-core{font-size:11px;font-weight:600;fill:#2563eb;text-anchor:middle;}
+.c-sub-core{font-size:9px;fill:#2563eb;text-anchor:middle;}
+.c-title-aero{font-size:11px;font-weight:600;fill:#ea580c;text-anchor:middle;}
+.c-sub-aero{font-size:9px;fill:#ea580c;text-anchor:middle;}
+.c-sub-mixed{font-size:9px;fill:#64748b;text-anchor:middle;}
+.dash{fill:#cbd5e1;font-size:12px;text-anchor:middle;}
+.legend{font-size:10.5px;fill:#334155;}
+</style>
+</defs>
+<rect x="0" y="0" width="1150" height="900" fill="#ffffff"/>
+
+<text x="575" y="28" class="title" text-anchor="middle">Keeping Process — Swimlane (CORE vs AERO)</text>
+<text x="575" y="46" class="subtitle" text-anchor="middle">อ่านแหล่ง object ตาม amsecwins.core_flag: 1 = CORE, อื่นๆ (0,2) = AERO</text>
+
+<!-- legend -->
+<circle cx="880" cy="18" r="5" fill="#2563eb"/>
+<text x="890" y="22" class="legend">CORE</text>
+<circle cx="950" cy="18" r="5" fill="#ea580c"/>
+<text x="960" y="22" class="legend">AERO</text>
+
+<!-- column headers -->
+<g>
+<rect x="180" y="60" width="160" height="40" class="hdr-bg"/>
+<text x="260" y="76" class="hdr-txt">Setup &amp;</text>
+<text x="260" y="90" class="hdr-txt">Master Data</text>
+
+<rect x="340" y="60" width="160" height="40" class="hdr-bg"/>
+<text x="420" y="76" class="hdr-txt">Request &amp;</text>
+<text x="420" y="90" class="hdr-txt">Import</text>
+
+<rect x="500" y="60" width="160" height="40" class="hdr-bg"/>
+<text x="580" y="76" class="hdr-txt">Adjust &amp;</text>
+<text x="580" y="90" class="hdr-txt">Verify</text>
+
+<rect x="660" y="60" width="160" height="40" class="hdr-bg"/>
+<text x="740" y="76" class="hdr-txt">Main Process</text>
+<text x="740" y="90" class="hdr-txt">(Keep &amp; Cut)</text>
+
+<rect x="820" y="60" width="160" height="40" class="hdr-bg"/>
+<text x="900" y="76" class="hdr-txt">Related</text>
+<text x="900" y="90" class="hdr-txt">Sub-process</text>
+
+<rect x="980" y="60" width="160" height="40" class="hdr-bg"/>
+<text x="1060" y="76" class="hdr-txt">Post-process</text>
+<text x="1060" y="90" class="hdr-txt">&amp; Output</text>
+</g>
+
+<!-- lane labels -->
+<rect x="20" y="100" width="150" height="150" class="lane-bg"/>
+<text x="32" y="170" class="lane-txt">เจ้าหน้าที่ /</text>
+<text x="32" y="184" class="lane-txt">ผู้ใช้งาน</text>
+
+<rect x="20" y="250" width="150" height="150" class="lane-bg"/>
+<text x="32" y="320" class="lane-txt">ASP.NET</text>
+<text x="32" y="334" class="lane-txt">Web Screens</text>
+
+<rect x="20" y="400" width="150" height="150" class="lane-bg"/>
+<text x="32" y="470" class="lane-txt">Oracle</text>
+<text x="32" y="484" class="lane-txt">Database</text>
+
+<rect x="20" y="550" width="150" height="150" class="lane-bg"/>
+<text x="32" y="620" class="lane-txt">PowerBuilder</text>
+<text x="32" y="634" class="lane-txt">Batch (PBProcess)</text>
+
+<rect x="20" y="700" width="150" height="150" class="lane-bg"/>
+<text x="32" y="770" class="lane-txt">Related</text>
+<text x="32" y="784" class="lane-txt">Modules</text>
+
+<!-- grid cells background (alternating by column for readability) -->
+<rect x="180" y="100" width="160" height="150" class="cell"/>
+<rect x="340" y="100" width="160" height="150" class="cell-alt"/>
+<rect x="500" y="100" width="160" height="150" class="cell"/>
+<rect x="660" y="100" width="160" height="150" class="cell-alt"/>
+<rect x="820" y="100" width="160" height="150" class="cell"/>
+<rect x="980" y="100" width="160" height="150" class="cell-alt"/>
+<rect x="180" y="250" width="160" height="150" class="cell"/>
+<rect x="340" y="250" width="160" height="150" class="cell-alt"/>
+<rect x="500" y="250" width="160" height="150" class="cell"/>
+<rect x="660" y="250" width="160" height="150" class="cell-alt"/>
+<rect x="820" y="250" width="160" height="150" class="cell"/>
+<rect x="980" y="250" width="160" height="150" class="cell-alt"/>
+<rect x="180" y="400" width="160" height="150" class="cell"/>
+<rect x="340" y="400" width="160" height="150" class="cell-alt"/>
+<rect x="500" y="400" width="160" height="150" class="cell"/>
+<rect x="660" y="400" width="160" height="150" class="cell-alt"/>
+<rect x="820" y="400" width="160" height="150" class="cell"/>
+<rect x="980" y="400" width="160" height="150" class="cell-alt"/>
+<rect x="180" y="550" width="160" height="150" class="cell"/>
+<rect x="340" y="550" width="160" height="150" class="cell-alt"/>
+<rect x="500" y="550" width="160" height="150" class="cell"/>
+<rect x="660" y="550" width="160" height="150" class="cell-alt"/>
+<rect x="820" y="550" width="160" height="150" class="cell"/>
+<rect x="980" y="550" width="160" height="150" class="cell-alt"/>
+<rect x="180" y="700" width="160" height="150" class="cell"/>
+<rect x="340" y="700" width="160" height="150" class="cell-alt"/>
+<rect x="500" y="700" width="160" height="150" class="cell"/>
+<rect x="660" y="700" width="160" height="150" class="cell-alt"/>
+<rect x="820" y="700" width="160" height="150" class="cell"/>
+<rect x="980" y="700" width="160" height="150" class="cell-alt"/>
+<!-- ROW1: Officer/User (cy=175) -->
+<text x="260" y="167" class="c-title">เจ้าหน้าที่การเงิน</text>
+<text x="260" y="185" class="c-sub">ตั้งค่าระบบเก็บเงิน</text>
+
+<text x="420" y="167" class="c-title">จนท. / สมาชิก</text>
+<text x="420" y="185" class="c-sub">ยื่นคำขอ นำเข้าไฟล์</text>
+
+<text x="580" y="167" class="c-title">เจ้าหน้าที่การเงิน</text>
+<text x="580" y="185" class="c-sub">ตรวจสอบ/ปรับปรุงชั่วคราว</text>
+
+<text x="740" y="167" class="c-title">เจ้าหน้าที่การเงิน</text>
+<text x="740" y="185" class="c-sub">สั่งเรียกเก็บ/ตัดยอด</text>
+
+<text x="900" y="167" class="c-title">ระบบอัตโนมัติ</text>
+<text x="900" y="185" class="c-sub">ประมวลผลย่อยที่เกี่ยวข้อง</text>
+
+<text x="1060" y="167" class="c-title">เจ้าหน้าที่การเงิน</text>
+<text x="1060" y="185" class="c-sub">พิมพ์ใบเสร็จ/ส่งออกข้อมูล</text>
+
+<!-- ROW2: Web .NET screens (cy=325) -->
+<text x="260" y="317" class="c-title-core">kpconstant, kpordercut</text>
+<text x="260" y="335" class="c-sub-core">+7 หน้าจอ (CORE)</text>
+
+<text x="420" y="317" class="c-title-core">req_kpmbexpense</text>
+<text x="420" y="335" class="c-sub-core">fileimport +3 (CORE)</text>
+
+<text x="580" y="317" class="c-title">check_kptp, adjust_kptp</text>
+<text x="580" y="335" class="c-sub-mixed">+5 หน้าจอ (5 CORE·2 AERO)</text>
+
+<text x="740" y="317" class="c-title-aero">process_keep</text>
+<text x="740" y="335" class="c-sub-aero">process_keepcut (AERO)</text>
+
+<text x="900" y="317" class="c-title">lon_proc_moneyreturn</text>
+<text x="900" y="335" class="c-sub-mixed">+7 หน้าจอ (4 CORE·3 AERO)</text>
+
+<text x="1060" y="317" class="c-title">reprint_receipt</text>
+<text x="1060" y="335" class="c-sub-mixed">exportfile_aero (AERO)</text>
+
+<!-- ROW3: Database (cy=475) -->
+<text x="260" y="467" class="c-title">kpconstant</text>
+<text x="260" y="485" class="c-sub">kpucfmthcutseq</text>
+
+<text x="420" y="467" class="c-title">kpmembexpense</text>
+<text x="420" y="485" class="c-sub">kpmastreceive</text>
+
+<text x="580" y="467" class="c-title">kptempreceive/det</text>
+<text x="580" y="485" class="c-sub">lncontmaster</text>
+
+<text x="740" y="467" class="c-title">cmprocessing</text>
+<text x="740" y="485" class="c-sub">kpmastreceive</text>
+
+<text x="900" y="467" class="c-title">lncontmaster</text>
+<text x="900" y="485" class="c-sub">dadebtagmthmast</text>
+
+<text x="1060" y="467" class="c-title">kpmastreceive</text>
+<text x="1060" y="485" class="c-sub">kptempreceive</text>
+
+<!-- ROW4: Batch PowerBuilder (cy=625) -->
+<text x="260" y="629" class="dash">—</text>
+<text x="420" y="629" class="dash">—</text>
+
+<text x="580" y="617" class="c-title">runPostProcess</text>
+<text x="580" y="635" class="c-sub">(check_kptp)</text>
+
+<text x="740" y="617" class="c-title">PBProcess.exe</text>
+<text x="740" y="635" class="c-sub">KEEPINGPROCESS→KEEPINGPOST</text>
+
+<text x="900" y="617" class="c-title">DPUPMONTH</text>
+<text x="900" y="635" class="c-sub">PROCSETINTRETURNNOTPOST</text>
+
+<text x="1060" y="629" class="dash">—</text>
+
+<!-- ROW5: Related modules (cy=775) -->
+<text x="260" y="779" class="dash">—</text>
+
+<text x="420" y="767" class="c-title">mbshr</text>
+<text x="420" y="785" class="c-sub">(memberdetail)</text>
+
+<text x="580" y="767" class="c-title">loan · insurance</text>
+<text x="580" y="785" class="c-sub">share (cancel_kpms)</text>
+
+<text x="740" y="767" class="c-title">debt-agency</text>
+<text x="740" y="785" class="c-sub">(dadebtagmthdet)</text>
+
+<text x="900" y="767" class="c-title">loan · insurance</text>
+<text x="900" y="785" class="c-sub">deposit · debt-agent</text>
+
+<text x="1060" y="779" class="dash">—</text>
+
+<!-- outer border -->
+<rect x="20" y="60" width="1120" height="790" fill="none" stroke="#cbd5e1" stroke-width="1.5"/>
+</svg>
+
+</div>
+</section>
+
+<section id="phases">
+<h2>4. ขั้นตอนการทำงาน (6 เฟส) — รายละเอียดหน้าจอแต่ละเฟส</h2>
+<h3>1. Setup &amp; Master Data — ตั้งค่าระบบและข้อมูลหลัก</h3>
+<p class="lead">ขั้นตอนตั้งค่าเบื้องต้นที่ทำครั้งแรกหรือเมื่อมีการเปลี่ยนนโยบาย ประกอบด้วยการกำหนดค่าคงที่หลัก ประเภทรายการหัก ลำดับการตัด สาเหตุการปรับปรุง และข้อมูลตัวแทนหักหนี้ ทุกหน้าจอในเฟสนี้มาจาก CORE ทั้งหมด</p>
+<table><thead><tr><th style="width:22%">Object (win_object)</th><th style="width:8%">Source</th><th style="width:24%">ตาราง/ไฟล์หลัก</th><th>รายละเอียด/หน้าที่</th></tr></thead><tbody>
+<tr><td><code>ws_kep_ucf_kpconstant</code></td><td><span class="badge core">CORE</span></td><td>kpconstant</td><td>ตั้งค่าคงที่หลักของระบบเก็บเงิน (flag เปิด/ปิดหมวดหุ้น เงินกู้ เงินฝาก ประกัน อื่นๆ เงินคืน) ที่ process_keep อ่านไปใช้ทุกครั้งที่ประมวลผล</td></tr>
+<tr><td><code>ws_kep_ucf_keepitemtype</code></td><td><span class="badge core">CORE</span></td><td>kpucfkeepitemtype</td><td>กำหนดประเภทรายการหักเงินหลักของระบบเก็บเงิน</td></tr>
+<tr><td><code>ws_kep_ucf_keepothitem</code></td><td><span class="badge core">CORE</span></td><td>kpmastreceivedet</td><td>กำหนดประเภทรายการหักเงินอื่นๆ เพิ่มเติมนอกเหนือหมวดหลัก</td></tr>
+<tr><td><code>ws_kep_ucf_kpadjustcause</code></td><td><span class="badge core">CORE</span></td><td>slslipadjust</td><td>กำหนดรหัส/สาเหตุการปรับปรุงรายการเก็บเงิน ใช้อ้างอิงตอนปรับปรุง/ยกเลิกรายการ</td></tr>
+<tr><td><code>ws_kep_ucf_kpordercut</code></td><td><span class="badge core">CORE</span></td><td>kpucfmthcutseq</td><td>กำหนดลำดับการตัดหักเงินแต่ละหมวด (หุ้น/เงินกู้/เงินฝาก/ประกัน) ก่อน-หลัง รวมถึงลำดับก่อนเปลี่ยนแปลง</td></tr>
+<tr><td><code>ws_kep_ucf_kpretitem</code></td><td><span class="badge core">CORE</span></td><td>kpucfitemmoneyreturn</td><td>กำหนดรายการที่สามารถคืนเงินให้สมาชิกได้หลังตัดยอด</td></tr>
+<tr><td><code>ws_ixp_config_keepingfile</code></td><td><span class="badge core">CORE</span></td><td>-</td><td>ตั้งค่ารูปแบบไฟล์นำเข้า/ส่งออกสำหรับระบบเก็บเงิน (interchange format)</td></tr>
+<tr><td><code>ws_dag_ucf_debtagent</code></td><td><span class="badge core">CORE</span></td><td>mbucfmembgroup</td><td>กำหนดตัวแทนหักหนี้ (หน่วยงาน/นายจ้างต้นสังกัดที่หักเงินเดือนส่งสหกรณ์)</td></tr>
+<tr><td><code>ws_ucf_dabtrewardfee</code></td><td><span class="badge core">CORE</span></td><td>-</td><td>กำหนดอัตราค่าตอบแทน/ค่าธรรมเนียมให้ตัวแทนหักหนี้</td></tr>
+</tbody></table>
+<h3>2. Request &amp; Import — ยื่นคำขอและนำเข้าข้อมูล</h3>
+<p class="lead">รวบรวมข้อมูลยอดที่จะเรียกเก็บก่อนเข้าสู่ขั้นตอนประมวลผล ทั้งจากคำขอของสมาชิกโดยตรงและจากไฟล์นำเข้าภายนอก ทุกหน้าจอในเฟสนี้มาจาก CORE</p>
+<table><thead><tr><th style="width:22%">Object (win_object)</th><th style="width:8%">Source</th><th style="width:24%">ตาราง/ไฟล์หลัก</th><th>รายละเอียด/หน้าที่</th></tr></thead><tbody>
+<tr><td><code>ws_kep_req_kpmbexpense</code></td><td><span class="badge core">CORE</span></td><td>kpmembexpense, kpreqchgexpense</td><td>สมาชิกยื่นคำขอ/ขอปรับยอดหักเงินรายเดือนแต่ละหมวด</td></tr>
+<tr><td><code>ws_kep_impmemb_kpothitem</code></td><td><span class="badge core">CORE</span></td><td>kpmastreceive</td><td>นำเข้ารายการหักอื่นๆ ระดับสมาชิกเป็นชุด (batch import)</td></tr>
+<tr><td><code>ws_kep_memb_kpothitem</code></td><td><span class="badge core">CORE</span></td><td>kpmastreceive, kprcvkeepother</td><td>บันทึก/แก้ไขรายการหักอื่นๆ รายบุคคล</td></tr>
+<tr><td><code>ws_kep_fileimport</code></td><td><span class="badge core">CORE</span></td><td>ixpkeepproc, ixpkeepprocdata, kptempreceive</td><td>นำเข้าไฟล์ยอดหักจากภายนอก (เช่นไฟล์จากหน่วยงานต้นสังกัด) เข้าสู่ตารางชั่วคราวก่อนประมวลผล</td></tr>
+<tr><td><code>ws_mem_memberdetail</code></td><td><span class="badge core">CORE</span></td><td>mbmembmaster</td><td>ดู/ตรวจสอบข้อมูลสมาชิกประกอบการเก็บเงิน (สถานะ ทุน วงเงินกู้)</td></tr>
+</tbody></table>
+<h3>3. Adjust &amp; Verify — ปรับปรุงและตรวจสอบก่อนตัดยอด</h3>
+<p class="lead">ปรับปรุง ยกเลิก และตรวจสอบความถูกต้องของรายการในตาราง kptempreceive/kptempreceivedet ก่อนสั่งตัดยอดจริง เฟสนี้มีทั้ง CORE (5 หน้าจอ) และ AERO (2 หน้าจอ: adjust_kptemp, lon_keep_adjust) ปะปนกัน</p>
+<table><thead><tr><th style="width:22%">Object (win_object)</th><th style="width:8%">Source</th><th style="width:24%">ตาราง/ไฟล์หลัก</th><th>รายละเอียด/หน้าที่</th></tr></thead><tbody>
+<tr><td><code>ws_kep_adjust_kptp</code></td><td><span class="badge core">CORE</span></td><td>kptempreceive/det, kpucfmthcutseq, lncontmaster</td><td>ปรับปรุงรายการเรียกเก็บชั่วคราวทั้งชุดก่อนตัดยอด (คิวลำดับตัด, เลขที่สัญญา)</td></tr>
+<tr><td><code>ws_kep_adjust_kptemp</code></td><td><span class="badge aero">AERO</span></td><td>kptempreceive/det, mbmembmaster</td><td>ปรับปรุงรายการเรียกเก็บชั่วคราวรายสมาชิก (เวอร์ชัน AERO)</td></tr>
+<tr><td><code>ws_kep_adjustitem_kptp</code></td><td><span class="badge core">CORE</span></td><td>kptempreceivedet</td><td>ปรับปรุงรายการย่อยระดับ item ในชุดเรียกเก็บชั่วคราว</td></tr>
+<tr><td><code>ws_kep_cancel_kpms</code></td><td><span class="badge core">CORE</span></td><td>kpmastreceive/det, lncontmaster, insinsuremaster, shsharemaster, mbmembmoneyreturn</td><td>ยกเลิก/ล้างรายการที่ตัดยอดไปแล้ว มีผลย้อนกลับต่อหุ้น เงินกู้ เงินฝาก ประกัน และเงินคืน</td></tr>
+<tr><td><code>ws_kep_check_kptp</code></td><td><span class="badge core">CORE</span></td><td>kptempreceive, kpreceiveexpense, ixpkeepprocdata</td><td>ตรวจสอบความถูกต้อง/ยอดรวมชุดเรียกเก็บก่อนตัดยอด เรียก batch runPostProcess ตรวจสอบ</td></tr>
+<tr><td><code>ws_kep_check_kptp_expensedebt</code></td><td><span class="badge core">CORE</span></td><td>dpdeptmaster, kparrearreceive, kpkepnotenoughmoneytosms</td><td>ตรวจสอบยอดหนี้/ค่าใช้จ่ายค้าง และแจ้งเตือนผ่าน SMS (มีเงื่อนไขเฉพาะสหกรณ์ EGAT)</td></tr>
+<tr><td><code>ws_lon_keep_adjust</code></td><td><span class="badge aero">AERO</span></td><td>kptempreceive/det, lncontmaster</td><td>สร้างรายการเรียกเก็บใหม่ (Re-gen) เมื่อสัญญาเงินกู้มีการแก้ไขระหว่างงวด (เวอร์ชัน AERO)</td></tr>
+</tbody></table>
+<h3>4. Main Process — ประมวลผลเรียกเก็บและตัดยอด</h3>
+<p class="lead">หัวใจของระบบ: process_keep สั่งเรียกเก็บ (KEEPINGPROCESS) และ process_keepcut สั่งตัดยอด/ผ่านรายการ (KEEPINGPOST / KEEPINGPOSTMEM) ทั้งสองหน้าจอถูก override เป็นเวอร์ชัน AERO ทั้งคู่ และเป็นตัวกระตุ้น PowerBuilder batch engine (PBProcess.exe) ให้ทำงานจริง</p>
+<table><thead><tr><th style="width:22%">Object (win_object)</th><th style="width:8%">Source</th><th style="width:24%">ตาราง/ไฟล์หลัก</th><th>รายละเอียด/หน้าที่</th></tr></thead><tbody>
+<tr><td><code>ws_kep_process_keep</code></td><td><span class="badge aero">AERO</span></td><td>cmprocessing, kpconstant</td><td>สั่งประมวลผลเรียกเก็บหลัก (KEEPINGPROCESS) ส่งต่อให้ PBProcess ประมวลผลตามหมวดที่เปิดใน kpconstant</td></tr>
+<tr><td><code>ws_kep_process_keepcut</code></td><td><span class="badge aero">AERO</span></td><td>cmprocessing, kpmastreceive, kpreceiveexpense, kptempgenreceiptno</td><td>สั่งตัดยอด/ผ่านรายการ (KEEPINGPOST / KEEPINGPOSTMEM) ออกเลขที่ใบเสร็จ บันทึกผลเป็นรายการถาวร</td></tr>
+</tbody></table>
+<h3>5. Related Sub-process — กระบวนการย่อยที่เกี่ยวข้อง</h3>
+<p class="lead">ผลกระทบต่อเนื่องจากรอบเก็บเงินไปยังโมดูลอื่น ได้แก่ เงินกู้ (ดอกเบี้ยคืน เงินต้นค้างชำระ) ประกัน (เบี้ยคืน) เงินฝาก (ตัดยอดเดือน) หนี้ค้างชำระ และสายตัวแทนหักหนี้ที่ทำงานคู่ขนานกับการเก็บเงินปกติ เฟสนี้มีทั้ง CORE (8 หน้าจอ) และ AERO (3 หน้าจอ)</p>
+<table><thead><tr><th style="width:22%">Object (win_object)</th><th style="width:8%">Source</th><th style="width:24%">ตาราง/ไฟล์หลัก</th><th>รายละเอียด/หน้าที่</th></tr></thead><tbody>
+<tr><td><code>ws_lon_proc_moneyreturn</code></td><td><span class="badge aero">AERO</span></td><td>lncontmaster/statement, mbmembmoneyreturn</td><td>ประมวลผลเงินคืนดอกเบี้ยเงินกู้ที่เกี่ยวเนื่องกับรอบเก็บเงิน (batch PROCSETINTRETURNNOTPOST)</td></tr>
+<tr><td><code>ws_ins_process_moneyreturn</code></td><td><span class="badge core">CORE</span></td><td>insinsuremaster/statement, finexptobankhis</td><td>ประมวลผลเงินคืนเบี้ยประกัน พร้อมโอนเงินคืนผ่านธนาคาร (มี hash สำหรับ SCB)</td></tr>
+<tr><td><code>ws_lon_proc_prinarrear_aero</code></td><td><span class="badge aero">AERO</span></td><td>kparrearreceive, kprcvkeepother, lncontmaster</td><td>ประมวลผลเงินต้นค้างชำระที่เกี่ยวข้องกับรอบเก็บเงิน (เวอร์ชัน AERO)</td></tr>
+<tr><td><code>ws_lon_interestestim</code></td><td><span class="badge core">CORE</span></td><td>-</td><td>คำนวณประมาณการดอกเบี้ยเงินกู้ประกอบการเรียกเก็บ</td></tr>
+<tr><td><code>ws_dep_truncate</code></td><td><span class="badge core">CORE</span></td><td>kptempreceive/det</td><td>ตัดยอด/ล้างข้อมูลเงินฝากประจำเดือน ก่อนต้นรอบใหม่ (batch DPUPMONTH)</td></tr>
+<tr><td><code>ws_kep_latertodebt</code></td><td><span class="badge core">CORE</span></td><td>kparrearreceive, kplatterarrear, cmdocumentcontrol</td><td>แปลงยอดที่เก็บไม่สำเร็จให้กลายเป็นหนี้ค้างชำระ พร้อมออกเลขที่เอกสาร</td></tr>
+<tr><td><code>ws_dag_setdebtagentgroup</code></td><td><span class="badge core">CORE</span></td><td>mbucfdebtagent, mbucfmembgroup</td><td>จัดกลุ่มตัวแทนหักหนี้</td></tr>
+<tr><td><code>ws_dag_change_debtagentgrp</code></td><td><span class="badge core">CORE</span></td><td>dadebtagmthdet/mast</td><td>เปลี่ยนกลุ่มตัวแทนหักหนี้ของสมาชิก</td></tr>
+<tr><td><code>ws_dag_process_mthdag</code></td><td><span class="badge core">CORE</span></td><td>dadebtagmthdet/mast/tranpay, kptempreceive/det</td><td>ประมวลผลรายเดือนของตัวแทนหักหนี้ (batch runPostProcess)</td></tr>
+<tr><td><code>ws_dag_pay_mthdag</code></td><td><span class="badge core">CORE</span></td><td>dadebtagmthmast</td><td>บันทึกรับชำระเงินจากตัวแทนหักหนี้</td></tr>
+<tr><td><code>ws_dag_pay_mthdag_memberno</code></td><td><span class="badge core">CORE</span></td><td>dadebtagmthmast</td><td>บันทึกรับชำระเงินจากตัวแทนหักหนี้ รายบุคคล/เลขที่สมาชิก</td></tr>
+<tr><td><code>ws_daq_process_dadebtagrewardfee</code></td><td><span class="badge core">CORE</span></td><td>dadebtagrewardfee</td><td>คำนวณค่าตอบแทน (reward fee) ให้ตัวแทนหักหนี้</td></tr>
+</tbody></table>
+<h3>6. Post-process &amp; Output — หลังประมวลผลและผลลัพธ์</h3>
+<p class="lead">การตรวจสอบผล พิมพ์เอกสาร และส่งออกข้อมูลหลังตัดยอดเสร็จสิ้น ประกอบด้วย 2 หน้าจอ CORE และ 1 หน้าจอ AERO</p>
+<table><thead><tr><th style="width:22%">Object (win_object)</th><th style="width:8%">Source</th><th style="width:24%">ตาราง/ไฟล์หลัก</th><th>รายละเอียด/หน้าที่</th></tr></thead><tbody>
+<tr><td><code>ws_kep_mbkptempdetail</code></td><td><span class="badge core">CORE</span></td><td>kptempreceive (inquiry)</td><td>ดูรายละเอียดรายการเก็บเงินชั่วคราวรายสมาชิก (สอบถามอย่างเดียว)</td></tr>
+<tr><td><code>ws_kep_reprint_receipt</code></td><td><span class="badge core">CORE</span></td><td>kpmastreceive, kptempreceive</td><td>พิมพ์ใบเสร็จรับเงินซ้ำ</td></tr>
+<tr><td><code>ws_kep_exportfile_aero</code></td><td><span class="badge aero">AERO</span></td><td>kptempreceive</td><td>ส่งออกไฟล์ข้อมูลรายการเก็บเงินไปยังระบบภายนอก/สำนักงานใหญ่ (เวอร์ชัน AERO)</td></tr>
+</tbody></table>
+</section>
+
+<section id="prd">
+<h2>5. สรุป PRD (Product Requirements)</h2>
+
+<h3>เป้าหมาย (Objectives)</h3>
+<ul>
+<li>รวบรวมข้อกำหนด (requirements) ของทุกหน้าจอในโมดูล Keeping จากทั้งสองแหล่งโค้ดให้เป็นเอกสารอ้างอิงเดียว</li>
+<li>กำหนดกฎการเลือกแหล่ง object ที่ชัดเจนและตรวจสอบย้อนกลับได้ (traceable) ตาม amsecwins.core_flag</li>
+<li>เป็นฐานสำหรับทีมพัฒนาในการแก้ไข ทดสอบ หรือย้ายระบบ (migration) ในอนาคตโดยไม่ต้องไล่อ่านซอร์สโค้ดใหม่ทั้งหมด</li>
+</ul>
+
+<h3>ขอบเขต (Scope)</h3>
+<p><strong>อยู่ในขอบเขต:</strong> window objects ทั้งหมด 37 รายการภายใต้ application = "keeping" ใน amsecwins (30 จาก CORE, 7 จาก AERO); การไหลของข้อมูลตั้งแต่ตั้งค่า → ยื่นคำขอ/นำเข้า → ตรวจสอบ/ปรับปรุง → ประมวลผลหลัก → กระบวนการย่อยที่เกี่ยวข้อง → หลังประมวลผล; จุดเชื่อมกับโมดูลเงินกู้ ประกัน เงินฝาก และตัวแทนหักหนี้ เฉพาะส่วนที่ทริกเกอร์จากรอบเก็บเงิน</p>
+<p><strong>นอกขอบเขต:</strong> Business logic ภายใน object PowerBuilder แบบ line-by-line ทั้งหมด; โมดูลอื่นที่ไม่ถูกอ้างอิงจากรอบเก็บเงินโดยตรง; รายการ ws_dag_pay_mthdag_memberno ที่ไม่พบไฟล์จริง</p>
+
+<h3 id="roles">บทบาทผู้ใช้งาน (User Roles)</h3>
+<table><thead><tr><th style="width:26%">บทบาท</th><th>หน้าที่ในกระบวนการ</th></tr></thead><tbody>
+<tr><td>เจ้าหน้าที่การเงิน (Finance Officer)</td><td>ตั้งค่าระบบ, ยื่น/อนุมัติคำขอ, ตรวจสอบและปรับปรุงข้อมูลชั่วคราว, สั่งประมวลผลเรียกเก็บ/ตัดยอด, พิมพ์ใบเสร็จ, ส่งออกข้อมูล</td></tr>
+<tr><td>สมาชิกสหกรณ์ (Member)</td><td>ยื่นคำขอปรับยอดหักเงินรายเดือน (ผ่านเจ้าหน้าที่หรือระบบที่เกี่ยวข้อง)</td></tr>
+<tr><td>ระบบอัตโนมัติ / Batch Engine (PBProcess)</td><td>ประมวลผลเบื้องหลังตามคำสั่งจาก .NET UI: คำนวณยอด ตัดยอด ออกเลขที่เอกสาร ประมวลผลเงินคืน/หนี้ค้างชำระ/ตัวแทนหักหนี้</td></tr>
+</tbody></table>
+
+<h3 id="nfr">ข้อกำหนดที่ไม่ใช่เชิงฟังก์ชัน (Non-Functional Requirements)</h3>
+<ul>
+<li><strong>Concurrency control:</strong> ป้องกันการสั่งประมวลผลซ้ำซ้อน โดยตรวจสอบ cmprocessing.runtime_status ก่อนเริ่มงานใหม่ทุกครั้ง</li>
+<li><strong>Auditability:</strong> ทุกรายการที่ตัดยอดแล้วต้องมีเลขที่เอกสารอ้างอิงผ่าน cmdocumentcontrol และเลขที่ใบเสร็จที่ไม่ซ้ำกัน</li>
+<li><strong>Data consistency:</strong> ค่าคงที่ควบคุมการประมวลผล (kpconstant) ต้องสอดคล้องกับค่าที่ batch engine ฝั่ง PowerBuilder อ่านไปใช้แบบ real-time</li>
+<li><strong>Multi-tenancy:</strong> ทุก transaction ต้องผูกกับ coop_control/coop_id เพื่อแยกข้อมูลรายสหกรณ์</li>
+<li><strong>Notification:</strong> ต้องรองรับการแจ้งเตือนผ่าน SMS สำหรับกรณีเฉพาะ (เช่น สหกรณ์ EGAT)</li>
+<li><strong>Traceability:</strong> การเปลี่ยนแปลงหรือ override ใดๆ ระหว่าง CORE กับ AERO ต้องตรวจสอบย้อนกลับได้ผ่านตาราง amsecwins</li>
+</ul>
+
+<h3 id="deps">Dependencies / โมดูลที่เกี่ยวข้อง</h3>
+<ul>
+<li>Loan (เงินกู้) — ดอกเบี้ยคืน, เงินต้นค้างชำระ, ปรับปรุงรายการเก็บเมื่อสัญญาเปลี่ยน</li>
+<li>Insurance (ประกัน) — เบี้ยประกันคืนพร้อมโอนผ่านธนาคาร</li>
+<li>Deposit (เงินฝาก) — ตัดยอดเดือน (DPUPMONTH)</li>
+<li>Debt-agency (ตัวแทนหักหนี้) — ประมวลผล/รับชำระ/คำนวณค่าตอบแทนรายเดือน คู่ขนานกับรอบเก็บเงินปกติ</li>
+<li>Membership (mbshr) — ข้อมูลสมาชิกประกอบการเก็บเงิน</li>
+</ul>
+
+<h3 id="issues">Assumptions &amp; Open Issues</h3>
+<ul>
+<li><code>ws_dag_pay_mthdag_memberno</code> ถูกระบุใน amsecwins (core_flag = 1) แต่ไม่พบไฟล์ .aspx จริงในโฟลเดอร์ CORE หรือ AERO — ต้องยืนยันกับทีมพัฒนา</li>
+<li>เอกสารนี้จัดทำจาก static code analysis เท่านั้น ยังไม่ได้ validate กับผู้ใช้งานจริงหรือ business SME</li>
+<li>รายละเอียด business rule ระดับลึกภายใน PowerBuilder object (เช่นลำดับการคำนวณใน of_rcvprocess) ยังไม่ได้ decompile ครบทุกบรรทัด</li>
+</ul>
+</section>
+
+<section id="pbjobs">
+<h2>6. รายละเอียด Job ที่ทำงานจริงใน PBProcess</h2>
+<p class="lead">สรุปจากการไล่โค้ดจริงใน pbprocess.pbl / pckeeping.pbl / pcloan.pbl / pcdeposit.pbl เฉพาะ job ที่วิ่งผ่าน PowerBuilder batch engine (PBProcess.exe) จริง</p>
+<table><thead><tr><th style="width:14%">Job (process_name)</th><th style="width:18%">Trigger (.NET)</th><th style="width:26%">PB Dispatcher / Function</th><th>รายละเอียดการทำงาน</th></tr></thead><tbody>
+<tr><td><strong>KEEPINGPROCESS</strong></td><td style="font-size:12.5px;">ws_kep_process_keep</td><td style="font-size:12.5px;"><code>n_cst_pbprocess_keeping → n_cst_keeping_process.of_pginit / of_initservice / of_rcvprocess()</code></td><td>อ่าน flag จาก kpconstant (share/loan/deposit/insure/firstfee/other/moneyreturn) มาคำนวณจำนวนขั้นตอนทั้งหมด ล้างข้อมูลเดือนก่อนหน้า (of_deletepriormonth) และล้างใบเสร็จ/รายการเดิมถ้าสั่งซ้ำ (of_deletereceipt หรือ of_deletercpitem แยกตามหมวด FFE/SHR/LON/DEP/OTH/MRT/INS/ETN) จากนั้นประมวลผลแต่ละหมวดตามลำดับใน kpucfmthcutseq ผ่าน of_processshare, of_processloan, of_processdeposit, of_processffee, of_processother, of_processmoneyreturn, of_processinsure คำนวณดอกเบี้ยค้างต่อเนื่อง (of_calcontinterest) สร้างรายการค่าใช้จ่าย (of_process_genexpense) สร้างเลขที่/ยอดใบเสร็จ (of_processrecpamt, of_processrecpno, of_set_newmaxseq) และสร้างรายงานสรุป (of_proc_genreport) ผลลัพธ์ยังเป็นข้อมูลชั่วคราวที่ kptempreceive/kptempreceivedet รอขั้นตัดยอด</td></tr>
+<tr><td><strong>KEEPINGPROCESSSWU</strong></td><td style="font-size:12.5px;">(เส้นทางสำรอง เฉพาะสหกรณ์กลุ่ม SWU ไม่อยู่ใน 37 หน้าจอ scope นี้)</td><td style="font-size:12.5px;"><code>n_cst_pbprocess_keeping → n_cst_keeping_process_swu.of_pginit / of_initservice / of_rcvprocess()</code></td><td>โครงสร้างขั้นตอนเหมือน KEEPINGPROCESS ทุกประการ (of_pginit → of_initservice → of_rcvprocess) แต่ logic ภายในถูกปรับสำหรับสหกรณ์กลุ่ม SWU โดยเฉพาะ</td></tr>
+<tr><td><strong>KEEPINGPOST</strong></td><td style="font-size:12.5px;">ws_kep_process_keepcut (posttype = "O" เสมอในโค้ดปัจจุบัน)</td><td style="font-size:12.5px;"><code>coop_control = 001001 → n_cst_keeping_post_mhd.of_rcvprocess_postmhd() | อื่นๆ → n_cst_keeping_post.of_rcvprocess_post()</code></td><td>ไล่ post รายหมวดจาก kptempreceive ไปตารางถาวรจริง ผ่าน of_post_toshare(), of_post_toinsure(), of_post_toffeememb(), of_post_tosharememb(), of_post_toloanmemb(), of_post_tomastmemb() (ต่อ 1 สมาชิก) และ of_postmoneyreturn() เป็นขั้นที่ออกเลขที่ใบเสร็จจริงและตัดยอดถาวร เวอร์ชัน _mhd (coop 001001) มีฟังก์ชันพิเศษเพิ่มเติมคือ of_post_cancel_keep_egat() และ of_post_tocancelpartial_aero() สำหรับยกเลิกบางส่วนแบบ AERO</td></tr>
+<tr><td><strong>KEEPINGPOSTMEM</strong></td><td style="font-size:12.5px;">ws_kep_process_keepcut (สำรองไว้ในโค้ด ปัจจุบันไม่ถูกเรียกเพราะ posttype ถูก hardcode เป็น "O")</td><td style="font-size:12.5px;"><code>n_cst_proc_deposit.of_init() + n_cst_keeping_post.of_rcvprocess_postmem()</code></td><td>ตัดยอดแบบรายสมาชิกเจาะจง แทนที่จะตัดทั้งชุดพร้อมกันแบบ KEEPINGPOST</td></tr>
+<tr><td><strong>DPUPMONTH</strong></td><td style="font-size:12.5px;">ws_dep_truncate</td><td style="font-size:12.5px;"><code>n_cst_proc_deposit.of_procdeptupmonth() (หรือ of_procdeptupmonth_egat เฉพาะ coop 065001)</code></td><td>ตัดยอด/ปิดงวดเงินฝากประจำเดือน คำนวณดอกเบี้ยเดือน ปรับสถานะสมาชิก/ตัวแทนหักหนี้ที่เกี่ยวโยงกับรายการเก็บเงินก่อนเริ่มงวดใหม่ ตัวแปรภายในครอบคลุมทั้งดอกเบี้ย ยอดหนี้ค้าง และตัวแทนหักหนี้</td></tr>
+<tr><td><strong>PROCSETINTRETURNNOTPOST</strong></td><td style="font-size:12.5px;">ws_lon_proc_moneyreturn</td><td style="font-size:12.5px;"><code>n_cst_proc_slmnyret.of_proc_setmnyreturn()</code></td><td>คำนวณยอดเงินต้น/ดอกเบี้ยคงเหลือก่อน-หลัง (bfprnbal, bfintret, prnbal, intretbal) แล้ว "ตั้งค่า" ยอดเงินคืนไว้ก่อน (ยังไม่ผ่านรายการจริงตามชื่อ NOTPOST) รอขั้น POST แยกต่างหากผ่าน of_proc_postmnyreturn()</td></tr>
+</tbody></table>
+</section>
+
+<section id="pblobjects">
+<h2>7. pckeeping.pbl — ภาพรวม 9 Objects</h2>
+<table><thead><tr><th style="width:22%">Object</th><th>บทบาท</th><th style="width:10%">จำนวน Function</th></tr></thead><tbody>
+<tr><td><code>n_cst_keeping_process</code></td><td>เอนจินหลักของ KEEPINGPROCESS (proc_name = KEEPINGPROCESS) — คำนวณยอดหักทุกหมวด (หุ้น/เงินกู้/เงินฝาก/ค่าแรกเข้า/ประกัน/อื่นๆ/เงินคืน/สวัสดิการ) และสร้างข้อมูลตั้งต้นใน kptempreceive ก่อนตัดยอดจริง</td><td style="text-align:center;">37</td></tr>
+<tr><td><code>n_cst_keeping_post</code></td><td>เอนจินหลักของ KEEPINGPOST (proc_name = KEEPINGPOST) — ผ่านรายการจาก kptempreceive เข้าตารางถาวร (kpmastreceive และตาราง detail แต่ละหมวด) รวมถึงรองรับการยกเลิก (cancel) รายการที่ตัดยอดไปแล้ว</td><td style="text-align:center;">34</td></tr>
+<tr><td><code>n_cst_keeping_service</code></td><td>อ็อบเจ็กต์บริการ (service object) ที่ใช้ร่วมกันระหว่าง process และ post — ฟังก์ชันสนับสนุนทั่วไป เช่น ตัวช่วยแปลง DataWindow/XML, ตัวช่วยสร้าง SQL, ตัวช่วยคำนวณดอกเบี้ย</td><td style="text-align:center;">28</td></tr>
+<tr><td><code>n_cst_pbprocess_keeping</code></td><td>ตัวกระจายงาน (dispatcher) — event ue_pbprocess ทำ choose case ตาม astr_process.proc_name แล้วเรียก business object ที่ตรงกัน (KEEPINGPROCESS/KEEPINGPOST/KEEPINGPOSTMEM/KEEPINGPROCESSSWU/DPUPMONTH/PROCSETINTRETURNNOTPOST ฯลฯ)</td><td style="text-align:center;">1</td></tr>
+<tr><td><code>n_cst_keeping_preprocess</code></td><td>ตัวแปรของ KEEPINGPROCESS สำหรับขั้นตอน "เตรียมข้อมูลก่อนประมวลผล" (pre-process) — มีฟังก์ชันมากที่สุด (42) เพราะรวม logic ตรวจสอบ/เตรียมข้อมูลเพิ่มเติมก่อนคำนวณจริง</td><td style="text-align:center;">42</td></tr>
+<tr><td><code>n_cst_keeping_process_old</code></td><td>เวอร์ชันเก่าของ n_cst_keeping_process ที่คงไว้ในไลบรารีเพื่อความเข้ากันได้ย้อนหลัง (legacy) ไม่ใช่เส้นทางหลักที่ dispatcher เรียกใช้ในปัจจุบัน</td><td style="text-align:center;">34</td></tr>
+<tr><td><code>n_cst_keeping_post_doh</code></td><td>ตัวแปรของ KEEPINGPOST เฉพาะกลุ่มสหกรณ์ DOH — ปรับ logic การผ่านรายการให้ตรงกับกติกาเฉพาะของสหกรณ์กลุ่มนี้</td><td style="text-align:center;">32</td></tr>
+<tr><td><code>n_cst_keeping_process_swu</code></td><td>ตัวแปรของ KEEPINGPROCESS สำหรับ proc_name = KEEPINGPROCESSSWU เฉพาะกลุ่มสหกรณ์ SWU — เพิ่มฟังก์ชัน of_processmutswu สำหรับคำนวณหมวดเฉพาะของ SWU</td><td style="text-align:center;">39</td></tr>
+<tr><td><code>n_cst_keeping_post_mhd</code></td><td>ตัวแปรของ KEEPINGPOST สำหรับ proc_name = KEEPINGPOSTMEM/coop_control = 001001 — ปรับ logic การผ่านรายการให้ตรงกับกติกาเฉพาะของสหกรณ์รหัส 001001</td><td style="text-align:center;">33</td></tr>
+</tbody></table>
+<p class="note">ฟังก์ชันจำนวนมากซ้ำกันข้ามหลายอ็อบเจ็กต์ (เช่น of_rcvprocess มีอยู่ใน 4 อ็อบเจ็กต์) เพราะอ็อบเจ็กต์ preprocess / old / swu / doh / mhd ถูกสร้างโดยคัดลอกโครงจาก n_cst_keeping_process หรือ n_cst_keeping_post แล้วปรับ logic เฉพาะจุด จำนวนฟังก์ชันเฉพาะ (unique) ทั้งไฟล์จึงเหลือ 88 ชื่อ</p>
+
+<h3>รายละเอียดการทำงานของแต่ละ Object ที่เกี่ยวกับ Keeping</h3>
+<div class="obj-card">
+  <h4 style="margin-top:0;"><code>n_cst_keeping_process</code></h4>
+  <div class="trigger">proc_name = KEEPINGPROCESS — ถูกเรียกเมื่อผู้ใช้กดปุ่ม "ประมวลผล" ที่หน้าจอ ws_kep_process_keep แล้ว .NET เรียก WebUtil.runProcessingExtend ส่งงานเข้าคิว cmprocessing</div>
+  <ol>
+  <li>of_initservice + of_getargument/of_setargument — รับพารามิเตอร์ปีงวด/เดือนที่รับ, ประเภทตัวกรอง, วันที่เอกสารจาก .NET</li>
+  <li>of_setanalyze + of_getsqlrank/of_setsqlselect — แปลงตัวกรองเป็นเงื่อนไข SQL</li>
+  <li>of_deletepriormonth + of_deletereceipt(_sql) + of_set_newmaxseq — ล้างข้อมูลชั่วคราวเดือนก่อนและรายการเดิม</li>
+  <li>of_rcvprocess — ลูปหลัก วนอ่านสมาชิกทีละราย เรียก of_processshare/of_processloan/of_processdeposit/of_processffee/of_processinsure/of_processother/of_processmoneyreturn/of_processwalfare</li>
+  <li>of_processloancalint / of_calcontinterest — คำนวณดอกเบี้ยเงินกู้และดอกเบี้ยค้าง</li>
+  <li>of_process_genexpense — สร้างรายการค่าใช้จ่าย</li>
+  <li>of_processrecpamt + of_processrecpno — รวมยอดและออกเลขที่ใบเสร็จชั่วคราว</li>
+  <li>of_genkptemp — เขียนผลลัพธ์ลง kptempreceive/kptempreceivedet</li>
+  <li>of_updatemem / of_updateexp / of_update_member_ref — อัปเดตสถานะสมาชิก</li>
+  <li>of_proc_genreport — สร้างข้อมูลสรุปแสดงผล</li>
+  </ol>
+  <div class="outcome">ผลลัพธ์คือข้อมูล "พร้อมตัดยอด" พักอยู่ใน kptempreceive/kptempreceivedet ยังไม่กระทบตารางบัญชีจริง รอ KEEPINGPOST</div>
+</div>
+<div class="obj-card">
+  <h4 style="margin-top:0;"><code>n_cst_keeping_post</code></h4>
+  <div class="trigger">proc_name = KEEPINGPOST — ถูกเรียกเมื่อผู้ใช้ตรวจสอบผลจาก KEEPINGPROCESS แล้วกดยืนยัน "ตัดยอด"</div>
+  <ol>
+  <li>of_rcvprocess_post — อ่านข้อมูลค้างใน kptempreceive/kptempreceivedet</li>
+  <li>of_del_mast — ลบ master เดิมก่อน กรณีสั่งตัดยอดซ้ำ</li>
+  <li>of_post_tomast + of_post_tomastdet(_dep/_ins/_lon/_shr) — เขียนเข้า kpmastreceive และตาราง detail แยกหมวด</li>
+  <li>of_post_toshare / of_post_toloan / of_post_toffee / of_post_toinsure / of_post_toother / of_post_todept — ผ่านรายการแต่ละหมวดไปตารางถาวร</li>
+  <li>of_post_toloanintarr + of_post_tocalloancalintstm — บันทึกดอกเบี้ยเงินกู้ค้าง</li>
+  <li>of_postmoneyreturn — ผ่านรายการเงินคืน</li>
+  <li>of_set_sql_chkdpbal — ตรวจสอบยอดคงเหลือเงินฝากก่อนตัดยอด</li>
+  <li>of_post_toupseqno + of_post_todisplay — อัปเดตลำดับและเตรียมข้อมูลแสดงผลยืนยันสำเร็จ</li>
+  <li>of_post_tocancelall / of_post_tocancelpartial(_aero) — ยกเลิกรายการที่ตัดยอดแล้วทั้งชุดหรือบางส่วน</li>
+  </ol>
+  <div class="outcome">ผลลัพธ์คือข้อมูลกลายเป็นรายการถาวรในระบบบัญชีจริง ตัดยอดหุ้น/เงินกู้/เงินฝากของสมาชิก จุดนี้ย้อนกลับได้เฉพาะผ่านฟังก์ชัน cancel</div>
+</div>
+<div class="obj-card">
+  <h4 style="margin-top:0;"><code>n_cst_keeping_service</code></h4>
+  <div class="trigger">ไม่มี proc_name ของตัวเอง — ถูก instantiate เป็นอ็อบเจ็กต์ย่อยภายใน n_cst_keeping_process และ n_cst_keeping_post เพื่อใช้ร่วมกัน</div>
+  <ol>
+  <li>of_setsqldw / of_setsqldw_coop / of_setsqldw_coop_recvperiod / of_setsqldw_recvperiod — ประกอบ SQL string ของ dynamic DataWindow</li>
+  <li>of_setsrvdw / of_setsrvdwxmlie — จัดการ service DataWindow และตัวแปลง DataWindow เป็น/จาก XML</li>
+  <li>of_setsrvlninterest / of_setsrvrdmoney — ตั้งค่า service คำนวณดอกเบี้ยเงินกู้และ service เงินคืน</li>
+  <li>of_set_msgerr — รวบรวมข้อความ error กลาง</li>
+  </ol>
+  <div class="outcome">เป็น "ชั้นบริการ" ให้ process/post ไม่ต้องเขียน SQL/จัดการ DataWindow ซ้ำเอง</div>
+</div>
+<div class="obj-card">
+  <h4 style="margin-top:0;"><code>n_cst_pbprocess_keeping</code></h4>
+  <div class="trigger">จุดเข้า (entry point) แรกที่ PBProcess.exe เรียกทุกครั้งที่ .NET ส่งงานในโมดูล keeping เข้าคิว cmprocessing</div>
+  <ol>
+  <li>event ue_pbprocess — อ่านค่า astr_process.proc_name ที่ .NET ส่งมา</li>
+  <li>choose case upper(astr_process.proc_name) — สร้าง instance ของอ็อบเจ็กต์ที่ตรงกัน: KEEPINGPROCESS → n_cst_keeping_process, KEEPINGPROCESSSWU → n_cst_keeping_process_swu, KEEPINGPOST → n_cst_keeping_post, KEEPINGPOSTMEM → n_cst_keeping_post_mhd, DPUPMONTH/PROCSETINTRETURNNOTPOST → business object ที่เกี่ยวข้อง</li>
+  </ol>
+  <div class="outcome">ทำหน้าที่เป็น "สวิตช์บอร์ด" กลางของโมดูล keeping — ถ้า proc_name ไม่ตรง case ใดเลย งานจะไม่ถูกประมวลผล</div>
+</div>
+<div class="obj-card">
+  <h4 style="margin-top:0;"><code>n_cst_keeping_preprocess</code></h4>
+  <div class="trigger">ตัวแปรของ n_cst_keeping_process ที่มีฟังก์ชันมากที่สุด (42) — คาดว่าใช้สำหรับขั้นตอน "ตรวจสอบ/เตรียมข้อมูลก่อนรันจริง"</div>
+  <ol>
+  <li>มีฟังก์ชันคำนวณครบทุกหมวดเหมือน n_cst_keeping_process</li>
+  <li>เพิ่มฟังก์ชันตรวจสอบเงื่อนไข/ความถูกต้องของข้อมูลมากกว่าเวอร์ชันหลัก</li>
+  </ol>
+  <div class="outcome">ทำหน้าที่เป็นขั้น "ตรวจสอบก่อนประมวลผลจริง" แยกจาก n_cst_keeping_process หลัก</div>
+</div>
+<div class="obj-card">
+  <h4 style="margin-top:0;"><code>n_cst_keeping_process_old</code></h4>
+  <div class="trigger">ไม่มี proc_name ที่ dispatcher ปัจจุบัน route มาถึง</div>
+  <ol>
+  <li>โครงสร้างและฟังก์ชันเกือบเหมือน n_cst_keeping_process ทุกประการ (34 จาก 37 ฟังก์ชัน)</li>
+  </ol>
+  <div class="outcome">เป็นเวอร์ชันเก่าก่อนปรับปรุง (legacy/dead code) ที่ยังไม่ถูกลบออกจากไลบรารี</div>
+</div>
+<div class="obj-card">
+  <h4 style="margin-top:0;"><code>n_cst_keeping_post_doh</code></h4>
+  <div class="trigger">ตัวแปรของ n_cst_keeping_post เฉพาะกลุ่มสหกรณ์ "DOH"</div>
+  <ol>
+  <li>โครงสร้างฟังก์ชันใกล้เคียง n_cst_keeping_post (32 จาก 34 ฟังก์ชัน) แต่ปรับ logic การผ่านรายการบางจุด</li>
+  </ol>
+  <div class="outcome">ทำให้การตัดยอดของกลุ่ม DOH เป็นไปตามกติกาเฉพาะ โดยไม่กระทบ logic หลัก</div>
+</div>
+<div class="obj-card">
+  <h4 style="margin-top:0;"><code>n_cst_keeping_process_swu</code></h4>
+  <div class="trigger">proc_name = KEEPINGPROCESSSWU — เส้นทางแยกสำหรับกลุ่มสหกรณ์ SWU</div>
+  <ol>
+  <li>มีฟังก์ชันครบเหมือน n_cst_keeping_process ทุกตัว</li>
+  <li>of_processmutswu — ฟังก์ชันเพิ่มเติมเฉพาะ ใช้คำนวณหมวดเฉพาะของกลุ่มสหกรณ์ SWU</li>
+  </ol>
+  <div class="outcome">ทำให้กลุ่ม SWU มีขั้นตอนคำนวณเพิ่มเติมเฉพาะตัว โดยยังใช้ logic หลักร่วมกัน</div>
+</div>
+<div class="obj-card">
+  <h4 style="margin-top:0;"><code>n_cst_keeping_post_mhd</code></h4>
+  <div class="trigger">proc_name = KEEPINGPOSTMEM — เส้นทางแยกสำหรับสหกรณ์รหัส coop_control = 001001</div>
+  <ol>
+  <li>of_rcvprocess_postmhd — จุดเริ่มต้นเฉพาะ แทนที่ of_rcvprocess_post</li>
+  <li>ฟังก์ชัน of_post_to* ที่เหลือคล้าย n_cst_keeping_post แต่ปรับกติกาเฉพาะสหกรณ์รหัส 001001</li>
+  </ol>
+  <div class="outcome">ทำให้การตัดยอดรายสมาชิก (postmem) ของสหกรณ์ 001001 เป็นไปตามกติกาเฉพาะ</div>
+</div>
+</section>
+
+<section id="pblfuncs">
+<h2>8. pckeeping.pbl — รายการฟังก์ชันทั้งหมด (88 ฟังก์ชัน)</h2>
+<p class="lead">แบ่งเป็น 4 กลุ่มตามบทบาทในกระบวนการเรียกเก็บเงิน คอลัมน์ "อยู่ในอ็อบเจ็กต์" แสดงชื่ออ็อบเจ็กต์แบบย่อที่พบฟังก์ชันนั้น</p>
+<div class="search-box">
+  <input type="text" id="funcSearch" placeholder="ค้นหาชื่อฟังก์ชัน หรือ คำอธิบาย...">
+</div>
+<h3>A. เริ่มต้น / ควบคุมการทำงาน (Initialize &amp; Control)</h3>
+<p class="lead">เตรียม service, รับ-ส่งพารามิเตอร์, ประกอบเงื่อนไข/SQL ก่อนเริ่มคำนวณจริง</p>
+<table class="func-table"><thead><tr><th style="width:18%">ชื่อฟังก์ชัน</th><th style="width:20%">อยู่ในอ็อบเจ็กต์</th><th>คำอธิบาย</th></tr></thead><tbody>
+<tr><td><code>of_initservice</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd, preprocess, process, process_old, process_swu, service</td><td>เตรียม service ย่อยที่ต้องใช้ก่อนเริ่มประมวลผล (สร้าง object บริการ เช่น dwxmlie, ตัวอ่าน kpconstant)</td></tr>
+<tr><td><code>of_getargument</code></td><td style="font-size:12.5px;">service</td><td>รับค่าพารามิเตอร์ (argument) ที่ .NET ส่งมาเป็น XML</td></tr>
+<tr><td><code>of_setargument</code></td><td style="font-size:12.5px;">service</td><td>ตั้งค่าพารามิเตอร์ก่อนส่งต่อให้ service ย่อยใช้งาน</td></tr>
+<tr><td><code>of_getproctype</code></td><td style="font-size:12.5px;">service</td><td>อ่านค่าประเภทการประมวลผล (proc_type: 1=ทั้งหมด, 2=กลุ่ม, 3=รายคน, 4=ประเภทสมาชิก, 5=ตัวแทนหักหนี้)</td></tr>
+<tr><td><code>of_setproctype</code></td><td style="font-size:12.5px;">service</td><td>ตั้งค่าประเภทการประมวลผล (proc_type)</td></tr>
+<tr><td><code>of_setanalyze</code></td><td style="font-size:12.5px;">service</td><td>วิเคราะห์ค่าตัวกรอง (rank) ตาม proc_type แตกออกเป็น array เงื่อนไข</td></tr>
+<tr><td><code>of_set_recvperiod</code></td><td style="font-size:12.5px;">service</td><td>ตั้งค่างวดที่รับ (recv_period = ปี+เดือน)</td></tr>
+<tr><td><code>of_set_txtmemgrp</code></td><td style="font-size:12.5px;">service</td><td>ตั้งข้อความตัวกรองกลุ่มสมาชิก ใช้ประกอบ SQL WHERE</td></tr>
+<tr><td><code>of_set_txtmemno</code></td><td style="font-size:12.5px;">service</td><td>ตั้งข้อความตัวกรองเลขที่สมาชิก ใช้ประกอบ SQL WHERE</td></tr>
+<tr><td><code>of_set_txtmemtyp</code></td><td style="font-size:12.5px;">service</td><td>ตั้งข้อความตัวกรองประเภทสมาชิก ใช้ประกอบ SQL WHERE</td></tr>
+<tr><td><code>of_set_txtmemagen</code></td><td style="font-size:12.5px;">service</td><td>ตั้งข้อความตัวกรองตัวแทนหักหนี้ ใช้ประกอบ SQL WHERE</td></tr>
+<tr><td><code>of_setsqldw</code></td><td style="font-size:12.5px;">service</td><td>ประกอบ SQL string ของ dynamic DataWindow ตามเงื่อนไขที่ตั้งไว้</td></tr>
+<tr><td><code>of_setsqldw_coop</code></td><td style="font-size:12.5px;">service</td><td>ประกอบ SQL string กรองตามสหกรณ์ (coop_id/coop_control)</td></tr>
+<tr><td><code>of_setsqldw_coop_recvperiod</code></td><td style="font-size:12.5px;">service</td><td>ประกอบ SQL string กรองตามสหกรณ์และงวดที่รับพร้อมกัน</td></tr>
+<tr><td><code>of_setsqldw_recvperiod</code></td><td style="font-size:12.5px;">service</td><td>ประกอบ SQL string กรองตามงวดที่รับ</td></tr>
+<tr><td><code>of_setsrvdwxmlie</code></td><td style="font-size:12.5px;">service</td><td>ตั้งค่า service แปลง DataWindow เป็น/จาก XML (import/export)</td></tr>
+<tr><td><code>of_set_msgerr</code></td><td style="font-size:12.5px;">service</td><td>ตั้งข้อความ error กลางสำหรับแจ้งเตือน</td></tr>
+<tr><td><code>of_getquery</code></td><td style="font-size:12.5px;">preprocess, process, process_old, process_swu</td><td>สร้างชุดคำสั่ง query หลักที่ใช้ควบคุมลำดับการประมวลผล</td></tr>
+<tr><td><code>of_getsqlselect</code></td><td style="font-size:12.5px;">preprocess, process, process_old, process_swu, service</td><td>สร้าง SQL select ที่ใช้ดึงข้อมูลสมาชิก/สัญญาที่เกี่ยวข้อง</td></tr>
+<tr><td><code>of_setsqlselect</code></td><td style="font-size:12.5px;">preprocess, process, process_old, process_swu, service</td><td>ปรับแต่ง SQL select ตามเงื่อนไขตัวกรอง (rank/proc_type)</td></tr>
+<tr><td><code>of_setsqlselect_kptemp</code></td><td style="font-size:12.5px;">preprocess, process, process_old, process_swu</td><td>ปรับแต่ง SQL select เฉพาะสำหรับตาราง kptempreceive</td></tr>
+<tr><td><code>of_getsqlrank</code></td><td style="font-size:12.5px;">preprocess, process, process_old, process_swu</td><td>สร้างเงื่อนไข SQL WHERE ตามค่า proc_type (rank filter: กลุ่ม/รายคน/ประเภท/ตัวแทน)</td></tr>
+<tr><td><code>of_setsrvdw</code></td><td style="font-size:12.5px;">preprocess, process, process_old, process_swu</td><td>ตั้งค่า service DataWindow ที่ใช้ระหว่างประมวลผล</td></tr>
+<tr><td><code>of_setsrvlninterest</code></td><td style="font-size:12.5px;">preprocess, process, process_old, process_swu</td><td>ตั้งค่า service คำนวณดอกเบี้ยเงินกู้</td></tr>
+<tr><td><code>of_setsrvrdmoney</code></td><td style="font-size:12.5px;">preprocess, process, process_old, process_swu</td><td>ตั้งค่า service เงินคืน (return money service)</td></tr>
+<tr><td><code>of_extfn</code></td><td style="font-size:12.5px;">preprocess, process, process_old, process_swu</td><td>เรียกใช้ external/extension function เพิ่มเติมสำหรับ logic เฉพาะที่ปรับแต่งได้</td></tr>
+<tr><td><code>of_pgstepit</code></td><td style="font-size:12.5px;">preprocess, process, process_swu</td><td>อัปเดตความคืบหน้า (progress step) กลับไปยัง cmprocessing ให้หน้าจอแสดงสถานะ</td></tr>
+</tbody></table>
+<h3>B. ลบ / ล้างข้อมูล (Delete &amp; Cleanup)</h3>
+<p class="lead">ลบข้อมูลชั่วคราวหรือข้อมูลเดิมก่อนรันประมวลผลใหม่ ป้องกันข้อมูลซ้ำซ้อน</p>
+<table class="func-table"><thead><tr><th style="width:18%">ชื่อฟังก์ชัน</th><th style="width:20%">อยู่ในอ็อบเจ็กต์</th><th>คำอธิบาย</th></tr></thead><tbody>
+<tr><td><code>of_deletepriormonth</code></td><td style="font-size:12.5px;">preprocess, process, process_old, process_swu</td><td>ลบข้อมูลชั่วคราวเดือนก่อนหน้าที่เกินจำนวนเดือนที่กำหนดให้เก็บ (kpmthclear_amt)</td></tr>
+<tr><td><code>of_deletereceipt</code></td><td style="font-size:12.5px;">preprocess, process, process_old, process_swu</td><td>ลบใบเสร็จ/รายการทั้งชุดก่อนรันประมวลผลใหม่ (SQL แบบปกติ)</td></tr>
+<tr><td><code>of_deletereceipt_sql</code></td><td style="font-size:12.5px;">preprocess, process, process_swu</td><td>ลบใบเสร็จ/รายการทั้งชุดก่อนรันใหม่ (เวอร์ชันสำหรับ ADO.Net)</td></tr>
+<tr><td><code>of_deletercpitem</code></td><td style="font-size:12.5px;">preprocess, process, process_old, process_swu</td><td>ลบเฉพาะรายการในหมวดที่ระบุ (FFE/SHR/LON/DEP/OTH/MRT/INS/ETN)</td></tr>
+<tr><td><code>of_deletercpitem_sql</code></td><td style="font-size:12.5px;">preprocess, process, process_swu</td><td>ลบเฉพาะรายการในหมวดที่ระบุ (เวอร์ชันสำหรับ ADO.Net)</td></tr>
+<tr><td><code>of_set_newmaxseq</code></td><td style="font-size:12.5px;">preprocess, process, process_swu</td><td>รีเซ็ต/กำหนดเลขลำดับ (sequence) สูงสุดใหม่หลังลบข้อมูลเดิม</td></tr>
+</tbody></table>
+<h3>C. ประมวลผล (Process Engine — KEEPINGPROCESS)</h3>
+<p class="lead">คำนวณยอดหักเงินแต่ละหมวด และสร้างข้อมูลตั้งต้นใน kptempreceive</p>
+<table class="func-table"><thead><tr><th style="width:18%">ชื่อฟังก์ชัน</th><th style="width:20%">อยู่ในอ็อบเจ็กต์</th><th>คำอธิบาย</th></tr></thead><tbody>
+<tr><td><code>of_rcvprocess</code></td><td style="font-size:12.5px;">preprocess, process, process_old, process_swu</td><td>จุดเริ่มต้นหลักของการ “เรียกเก็บ” — ควบคุมลำดับขั้นตอนทั้งหมดของ KEEPINGPROCESS</td></tr>
+<tr><td><code>of_processshare</code></td><td style="font-size:12.5px;">pbprocess_keeping, preprocess, process, process_old, process_swu</td><td>คำนวณยอดหักหุ้นของสมาชิกที่เข้าเงื่อนไข</td></tr>
+<tr><td><code>of_processloan</code></td><td style="font-size:12.5px;">preprocess, process, process_old, process_swu</td><td>คำนวณยอดหักงวดชำระเงินกู้</td></tr>
+<tr><td><code>of_processloancalint</code></td><td style="font-size:12.5px;">preprocess, process, process_swu</td><td>คำนวณดอกเบี้ยเงินกู้ประกอบการหักงวด</td></tr>
+<tr><td><code>of_processloanarr_egat</code></td><td style="font-size:12.5px;">process, process_old, process_swu</td><td>คำนวณเงินกู้ค้างชำระ กรณีเฉพาะสหกรณ์ EGAT</td></tr>
+<tr><td><code>of_processdeposit</code></td><td style="font-size:12.5px;">preprocess, process, process_old, process_swu, service</td><td>คำนวณยอดหักเงินฝาก</td></tr>
+<tr><td><code>of_processffee</code></td><td style="font-size:12.5px;">preprocess, process, process_old, process_swu, service</td><td>คำนวณยอดหักค่าแรกเข้า (first fee)</td></tr>
+<tr><td><code>of_processinsure</code></td><td style="font-size:12.5px;">preprocess, process, process_swu</td><td>คำนวณยอดหักเบี้ยประกัน</td></tr>
+<tr><td><code>of_processother</code></td><td style="font-size:12.5px;">preprocess, process, process_old, process_swu</td><td>คำนวณยอดหักรายการอื่นๆ นอกเหนือหมวดหลัก</td></tr>
+<tr><td><code>of_processmoneyreturn</code></td><td style="font-size:12.5px;">preprocess, process, process_old, process_swu</td><td>คำนวณยอดเงินคืนที่เกี่ยวข้องกับรอบเก็บเงินนี้</td></tr>
+<tr><td><code>of_processwalfare</code></td><td style="font-size:12.5px;">process, process_old, process_swu</td><td>คำนวณยอดหักเงินสวัสดิการ (welfare)</td></tr>
+<tr><td><code>of_processmutswu</code></td><td style="font-size:12.5px;">process_swu</td><td>คำนวณยอดหักเฉพาะกลุ่มสหกรณ์ SWU (มีเฉพาะในเวอร์ชัน SWU)</td></tr>
+<tr><td><code>of_calcontinterest</code></td><td style="font-size:12.5px;">preprocess, process, process_old, process_swu</td><td>คำนวณดอกเบี้ยค้างแบบต่อเนื่อง (continuing/accrued interest)</td></tr>
+<tr><td><code>of_process_genexpense</code></td><td style="font-size:12.5px;">preprocess, process, process_old, process_swu</td><td>สร้างรายการค่าใช้จ่าย (expense) ที่เกิดจากการหักเงินรอบนี้</td></tr>
+<tr><td><code>of_processrecpamt</code></td><td style="font-size:12.5px;">preprocess, process, process_old, process_swu</td><td>คำนวณยอดรวมของใบเสร็จแต่ละใบ</td></tr>
+<tr><td><code>of_processrecpno</code></td><td style="font-size:12.5px;">preprocess, process, process_old, process_swu</td><td>ออกเลขที่ใบเสร็จชั่วคราวให้แต่ละรายการ</td></tr>
+<tr><td><code>of_proc_genreport</code></td><td style="font-size:12.5px;">preprocess, process, process_old, process_swu</td><td>สร้างข้อมูลสรุปสำหรับรายงานหลังประมวลผลเสร็จ</td></tr>
+<tr><td><code>of_updateexp</code></td><td style="font-size:12.5px;">preprocess, process, process_old, process_swu</td><td>อัปเดตยอดค่าใช้จ่ายของสมาชิกหลังคำนวณ</td></tr>
+<tr><td><code>of_updatemem</code></td><td style="font-size:12.5px;">preprocess, process, process_old, process_swu</td><td>อัปเดตข้อมูล/สถานะสมาชิกหลังคำนวณ</td></tr>
+<tr><td><code>of_update_member_ref</code></td><td style="font-size:12.5px;">process, process_old, process_swu</td><td>อัปเดตเลขที่สมาชิกอ้างอิง กรณีมีการโอนย้าย (transfer_status)</td></tr>
+<tr><td><code>of_genkptemp</code></td><td style="font-size:12.5px;">preprocess, process, process_old, process_swu</td><td>สร้างแถวข้อมูลตั้งต้นในตาราง kptempreceive/kptempreceivedet สำหรับสมาชิกที่เข้าเงื่อนไข</td></tr>
+</tbody></table>
+<h3>D. ตัดยอด (Post Engine — KEEPINGPOST)</h3>
+<p class="lead">ผ่านรายการจากตารางชั่วคราวเข้าตารางถาวร รวมถึงฟังก์ชันยกเลิกรายการ</p>
+<table class="func-table"><thead><tr><th style="width:18%">ชื่อฟังก์ชัน</th><th style="width:20%">อยู่ในอ็อบเจ็กต์</th><th>คำอธิบาย</th></tr></thead><tbody>
+<tr><td><code>of_rcvprocess_post</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd</td><td>จุดเริ่มต้นหลักของการ “ตัดยอด” ทั้งชุด (ใช้กับ KEEPINGPOST)</td></tr>
+<tr><td><code>of_rcvprocess_postmem</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd</td><td>จุดเริ่มต้นการตัดยอดแบบรายสมาชิก (ใช้กับ KEEPINGPOSTMEM)</td></tr>
+<tr><td><code>of_rcvprocess_postmhd</code></td><td style="font-size:12.5px;">post, post_mhd, process_old</td><td>จุดเริ่มต้นการตัดยอด เฉพาะ coop_control = 001001</td></tr>
+<tr><td><code>of_del_mast</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd</td><td>ลบข้อมูล master เดิมก่อนตัดยอดใหม่ (กรณีสั่งประมวลผลซ้ำ)</td></tr>
+<tr><td><code>of_post_toshare</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd, service</td><td>ผ่านรายการหุ้นทั้งชุดจาก kptempreceive ไปตารางถาวร</td></tr>
+<tr><td><code>of_post_tosharememb</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd</td><td>ผ่านรายการหุ้นเฉพาะรายสมาชิก</td></tr>
+<tr><td><code>of_post_tosharer_egat</code></td><td style="font-size:12.5px;">post, post_doh, preprocess</td><td>ผ่านรายการหุ้น เฉพาะสหกรณ์ EGAT</td></tr>
+<tr><td><code>of_post_toloan</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd</td><td>ผ่านรายการเงินกู้ทั้งชุดไปตารางถาวร</td></tr>
+<tr><td><code>of_post_toloanmemb</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd, service</td><td>ผ่านรายการเงินกู้เฉพาะรายสมาชิก</td></tr>
+<tr><td><code>of_post_toloan_egat</code></td><td style="font-size:12.5px;">post, preprocess</td><td>ผ่านรายการเงินกู้ เฉพาะสหกรณ์ EGAT</td></tr>
+<tr><td><code>of_post_toloanintarr</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd, preprocess</td><td>ผ่านรายการดอกเบี้ยเงินกู้ค้างชำระ</td></tr>
+<tr><td><code>of_post_tocalloancalintstm</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd, preprocess</td><td>คำนวณและบันทึก statement ดอกเบี้ยเงินกู้หลังตัดยอด</td></tr>
+<tr><td><code>of_post_toffee</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd</td><td>ผ่านรายการค่าแรกเข้าทั้งชุดไปตารางถาวร</td></tr>
+<tr><td><code>of_post_toffeememb</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd</td><td>ผ่านรายการค่าแรกเข้าเฉพาะรายสมาชิก</td></tr>
+<tr><td><code>of_post_toinsure</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd, service</td><td>ผ่านรายการเบี้ยประกันไปตารางถาวร</td></tr>
+<tr><td><code>of_post_todept</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd, service</td><td>ผ่านรายการหนี้ (debt/dept) ที่เกี่ยวข้อง</td></tr>
+<tr><td><code>of_post_toother</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd</td><td>ผ่านรายการอื่นๆ ไปตารางถาวร</td></tr>
+<tr><td><code>of_post_todetpmthcut</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd, service</td><td>บันทึกรายละเอียดลำดับการตัดประจำเดือน (detail per month cut)</td></tr>
+<tr><td><code>of_postmoneyreturn</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd</td><td>ผ่านรายการเงินคืนไปตารางถาวร</td></tr>
+<tr><td><code>of_post_tomast</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd</td><td>ผ่านรายการเข้าตาราง master หลัก (kpmastreceive)</td></tr>
+<tr><td><code>of_post_tomastdet</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd</td><td>ผ่านรายการเข้าตาราง master-detail หลัก</td></tr>
+<tr><td><code>of_post_tomastdet_dep</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd, preprocess</td><td>ผ่านรายการ detail หมวดเงินฝาก</td></tr>
+<tr><td><code>of_post_tomastdet_ins</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd, service</td><td>ผ่านรายการ detail หมวดประกัน</td></tr>
+<tr><td><code>of_post_tomastdet_lon</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd, process_swu</td><td>ผ่านรายการ detail หมวดเงินกู้</td></tr>
+<tr><td><code>of_post_tomastdet_shr</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd, preprocess</td><td>ผ่านรายการ detail หมวดหุ้น</td></tr>
+<tr><td><code>of_post_tomastmemb</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd</td><td>ผ่านรายการเข้าตาราง master เฉพาะรายสมาชิก</td></tr>
+<tr><td><code>of_post_toupseqno</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd</td><td>อัปเดตเลขลำดับ (sequence) หลังผ่านรายการเสร็จ</td></tr>
+<tr><td><code>of_post_todisplay</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd</td><td>เตรียมข้อมูลสำหรับแสดงผล/รายงานหลังตัดยอด</td></tr>
+<tr><td><code>of_post_tocancelall</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd, service</td><td>ยกเลิกรายการที่ตัดยอดไปแล้วทั้งชุด</td></tr>
+<tr><td><code>of_post_tocancelpartial</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd, preprocess</td><td>ยกเลิกรายการที่ตัดยอดไปแล้วบางส่วน</td></tr>
+<tr><td><code>of_post_tocancelpartial_aero</code></td><td style="font-size:12.5px;">post_mhd, process_old</td><td>ยกเลิกรายการที่ตัดยอดไปแล้วบางส่วน (เวอร์ชัน AERO)</td></tr>
+<tr><td><code>of_post_cancel_keep_egat</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd, process_old</td><td>ยกเลิกรายการเก็บเงิน เฉพาะสหกรณ์ EGAT</td></tr>
+<tr><td><code>of_set_sql_chkdpbal</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd</td><td>ตรวจสอบยอดคงเหลือเงินฝากก่อนตัดยอด (ป้องกันยอดติดลบ)</td></tr>
+<tr><td><code>of_update_expense</code></td><td style="font-size:12.5px;">post, post_doh, post_mhd, preprocess</td><td>อัปเดตยอดค่าใช้จ่ายหลังตัดยอด</td></tr>
+</tbody></table>
+<h3>หมายเหตุวิธีการอ่านข้อมูล (Methodology)</h3>
+<p>pckeeping.pbl เป็นไฟล์ compiled ของ PowerBuilder (p-code) ไม่ใช่ source code แบบ text ธรรมดา การอ่านทำโดย extract สตริงที่ฝังอยู่ในไฟล์แบบ UTF-16LE (<code>strings -e l</code>) ซึ่งสามารถอ่านชื่อ object, ชื่อฟังก์ชัน, และคำสั่ง SQL ที่ฝังในโค้ดได้ แต่ไม่สามารถอ่าน logic แบบ step-by-step ทั้งหมดได้ครบถ้วนเหมือน source code ต้นฉบับ (.srw/.sru)</p>
+<p>คำอธิบายของแต่ละฟังก์ชันในเอกสารนี้อ้างอิงจาก 3 แหล่งประกอบกัน: (1) รูปแบบการตั้งชื่อฟังก์ชันตามธรรมเนียม PowerBuilder/GCOOP, (2) บริบทจาก choose case ใน dispatcher และลำดับการเรียกที่พบในสตริง, และ (3) ความสอดคล้องกับ workflow ที่ทราบจาก PRD ของโมดูล Keeping ผู้ใช้ที่ต้องการรายละเอียด logic ระดับบรรทัดควรเปิดไฟล์ต้นฉบับด้วย PowerBuilder IDE (Object Browser)</p>
+</section>
+
+<section id="appendix">
+<h2>9. ภาคผนวก: ตารางอ้างอิงเต็ม amsecwins (application = keeping)</h2>
+<p class="lead">เรียงตามชื่อ win_object — คอลัมน์ core_flag และ Source มาจากกฎในหัวข้อ 2</p>
+<table><thead><tr><th style="width:10%">window_id</th><th style="width:26%">win_object</th><th style="width:8%">core_flag</th><th style="width:8%">Source</th><th>Folder path (resolved)</th></tr></thead><tbody>
+<tr><td>KP-DAG0006</td><td><code>ws_dag_change_debtagentgrp</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\debtagency\ws_dag_change_debtagentgrp_ctrl\ws_dag_change_debtagentgrp.aspx</td></tr>
+<tr><td>KP-DAG0004</td><td><code>ws_dag_pay_mthdag</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\debtagency\ws_dag_pay_mthdag_ctrl\ws_dag_pay_mthdag.aspx</td></tr>
+<tr><td>KP-DAG0007</td><td><code>ws_dag_pay_mthdag_memberno</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">MISSING</td></tr>
+<tr><td>KP-DAG0003</td><td><code>ws_dag_process_mthdag</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\debtagency\ws_dag_process_mthdag_ctrl\ws_dag_process_mthdag.aspx</td></tr>
+<tr><td>KP-DAG0002</td><td><code>ws_dag_setdebtagentgroup</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\debtagency\ws_dag_setdebtagentgroup_ctrl\ws_dag_setdebtagentgroup.aspx</td></tr>
+<tr><td>KP-DAG0001</td><td><code>ws_dag_ucf_debtagent</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\debtagency\ws_dag_ucf_debtagent_ctrl\ws_dag_ucf_debtagent.aspx</td></tr>
+<tr><td>KP-DAG0005</td><td><code>ws_daq_process_dadebtagrewardfee</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\debtagency\ws_daq_process_dadebtagrewardfee_ctrl\ws_daq_process_dadebtagrewardfee.aspx</td></tr>
+<tr><td>KP-MRC0020</td><td><code>ws_dep_truncate</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\deposit\ws_dep_truncate_ctrl\ws_dep_truncate.aspx</td></tr>
+<tr><td>KP-MRC0170</td><td><code>ws_ins_process_moneyreturn</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\insurance\ws_ins_process_moneyreturn_ctrl\ws_ins_process_moneyreturn.aspx</td></tr>
+<tr><td>KP-CNT0080</td><td><code>ws_ixp_config_keepingfile</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\ixp\ws_ixp_config_keepingfile_ctrl\ws_ixp_config_keepingfile.aspx</td></tr>
+<tr><td>KP-CCL0011</td><td><code>ws_kep_adjust_kptemp</code></td><td style="text-align:center;">2</td><td><span class="badge aero">AERO</span></td><td style="font-size:12px;">AERO\GCOOP\Saving\Applications\keeping\ws_kep_adjust_kptemp_ctrl\ws_kep_adjust_kptemp.aspx</td></tr>
+<tr><td>KP-CCL0021</td><td><code>ws_kep_adjust_kptp</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\keeping\ws_kep_adjust_kptp_ctrl\ws_kep_adjust_kptp.aspx</td></tr>
+<tr><td>KP-CCL0010</td><td><code>ws_kep_adjustitem_kptp</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\keeping\ws_kep_adjustitem_kptp_ctrl\ws_kep_adjustitem_kptp.aspx</td></tr>
+<tr><td>KP-CCL0020</td><td><code>ws_kep_cancel_kpms</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\keeping\ws_kep_cancel_kpms_ctrl\ws_kep_cancel_kpms.aspx</td></tr>
+<tr><td>KP-CCL0050</td><td><code>ws_kep_check_kptp</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\keeping\ws_kep_check_kptp_ctrl\ws_kep_check_kptp.aspx</td></tr>
+<tr><td>KP-OPR0080</td><td><code>ws_kep_check_kptp_expensedebt</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\keeping\ws_kep_check_kptp_expensedebt_ctrl\ws_kep_check_kptp_expensedebt.aspx</td></tr>
+<tr><td>KP-OPR0030</td><td><code>ws_kep_exportfile_aero</code></td><td style="text-align:center;">2</td><td><span class="badge aero">AERO</span></td><td style="font-size:12px;">AERO\GCOOP\Saving\Applications\keeping\ws_kep_exportfile_aero_ctrl\ws_kep_exportfile_aero.aspx</td></tr>
+<tr><td>KP-OPR0031</td><td><code>ws_kep_fileimport</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\keeping\ws_kep_fileimport_ctrl\ws_kep_fileimport.aspx</td></tr>
+<tr><td>KP-OPR0020</td><td><code>ws_kep_impmemb_kpothitem</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\keeping\ws_kep_impmemb_kpothitem_ctrl\ws_kep_impmemb_kpothitem.aspx</td></tr>
+<tr><td>KP-OPR0050</td><td><code>ws_kep_latertodebt</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\keeping\ws_kep_latertodebt_ctrl\ws_kep_latertodebt.aspx</td></tr>
+<tr><td>KP-OPR0040</td><td><code>ws_kep_mbkptempdetail</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\keeping\ws_kep_mbkptempdetail_ctrl\ws_kep_mbkptempdetail.aspx</td></tr>
+<tr><td>KP-OPR0010</td><td><code>ws_kep_memb_kpothitem</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\keeping\ws_kep_memb_kpothitem_ctrl\ws_kep_memb_kpothitem.aspx</td></tr>
+<tr><td>KP-MRC0010</td><td><code>ws_kep_process_keep</code></td><td style="text-align:center;">2</td><td><span class="badge aero">AERO</span></td><td style="font-size:12px;">AERO\GCOOP\Saving\Applications\keeping\ws_kep_process_keep_ctrl\ws_kep_process_keep.aspx</td></tr>
+<tr><td>KP-MRC0030</td><td><code>ws_kep_process_keepcut</code></td><td style="text-align:center;">0</td><td><span class="badge aero">AERO</span></td><td style="font-size:12px;">AERO\GCOOP\Saving\Applications\keeping\ws_kep_process_keepcut_ctrl\ws_kep_process_keepcut.aspx</td></tr>
+<tr><td>KP-OPR0070</td><td><code>ws_kep_reprint_receipt</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\keeping\ws_kep_reprint_receipt_ctrl\ws_kep_reprint_receipt.aspx</td></tr>
+<tr><td>KP-REQ0010</td><td><code>ws_kep_req_kpmbexpense</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\keeping\ws_kep_req_kpmbexpense_ctrl\ws_kep_req_kpmbexpense.aspx</td></tr>
+<tr><td>KP-CNT0020</td><td><code>ws_kep_ucf_keepitemtype</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\keeping\ws_kep_ucf_keepitemtype_ctrl\ws_kep_ucf_keepitemtype.aspx</td></tr>
+<tr><td>KP-CNT0030</td><td><code>ws_kep_ucf_keepothitem</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\keeping\ws_kep_ucf_keepothitem_ctrl\ws_kep_ucf_keepothitem.aspx</td></tr>
+<tr><td>KP-CNT0050</td><td><code>ws_kep_ucf_kpadjustcause</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\keeping\ws_kep_ucf_kpadjustcause_ctrl\ws_kep_ucf_kpadjustcause.aspx</td></tr>
+<tr><td>KP-CNT0010</td><td><code>ws_kep_ucf_kpconstant</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\keeping\ws_kep_ucf_kpconstant_ctrl\ws_kep_ucf_kpconstant.aspx</td></tr>
+<tr><td>KP-CNT0040</td><td><code>ws_kep_ucf_kpordercut</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\keeping\ws_kep_ucf_kpordercut_ctrl\ws_kep_ucf_kpordercut.aspx</td></tr>
+<tr><td>KP-CNT0060</td><td><code>ws_kep_ucf_kpretitem</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\keeping\ws_kep_ucf_kpretitem_ctrl\ws_kep_ucf_kpretitem.aspx</td></tr>
+<tr><td>KP-OPR0088</td><td><code>ws_lon_interestestim</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\loan\ws_lon_interestestim_ctrl\ws_lon_interestestim.aspx</td></tr>
+<tr><td>KP-MRC0160</td><td><code>ws_lon_keep_adjust</code></td><td style="text-align:center;">2</td><td><span class="badge aero">AERO</span></td><td style="font-size:12px;">AERO\GCOOP\Saving\Applications\loan\ws_lon_keep_adjust_ctrl\ws_lon_keep_adjust.aspx</td></tr>
+<tr><td>KP-MRC0040</td><td><code>ws_lon_proc_moneyreturn</code></td><td style="text-align:center;">0</td><td><span class="badge aero">AERO</span></td><td style="font-size:12px;">AERO\GCOOP\Saving\Applications\loan\ws_lon_proc_moneyreturn_ctrl\ws_lon_proc_moneyreturn.aspx</td></tr>
+<tr><td>KP-MRC0050</td><td><code>ws_lon_proc_prinarrear_aero</code></td><td style="text-align:center;">2</td><td><span class="badge aero">AERO</span></td><td style="font-size:12px;">AERO\GCOOP\Saving\Applications\loan\ws_lon_proc_prinarrear_aero_ctrl\ws_lon_proc_prinarrear_aero.aspx</td></tr>
+<tr><td>KP-OPR0060</td><td><code>ws_mem_memberdetail</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\mbshr\ws_mem_memberdetail_ctrl\ws_mem_memberdetail.aspx</td></tr>
+<tr><td>KP-CNT0070</td><td><code>ws_ucf_dabtrewardfee</code></td><td style="text-align:center;">1</td><td><span class="badge core">CORE</span></td><td style="font-size:12px;">CORE\GCOOP\Saving\Applications\debtagency\ws_ucf_dabtrewardfee_ctrl\ws_ucf_dabtrewardfee.aspx</td></tr>
+</tbody></table>
+</section>
+
+</main>
+</div>
+
+<footer>
+  จัดทำจากการวิเคราะห์ซอร์สโค้ดจริงในโฟลเดอร์ CORE และ AERO (ASP.NET WebForms), ไฟล์ amsecwins, และไลบรารี PowerBuilder pckeeping.pbl (strings extraction) — เอกสารนี้เป็นผลจาก static code analysis ยังไม่ผ่านการยืนยันจาก Business SME
+</footer>
+
+<script>
+  const searchInput = document.getElementById('funcSearch');
+  if (searchInput) {
+    searchInput.addEventListener('input', function() {
+      const q = this.value.trim().toLowerCase();
+      document.querySelectorAll('.func-table tbody tr').forEach(function(tr) {
+        const text = tr.textContent.toLowerCase();
+        tr.style.display = text.includes(q) ? '' : 'none';
+      });
+    });
+  }
+</script>
+
+</body>
+</html>
