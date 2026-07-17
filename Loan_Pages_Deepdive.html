@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>เจาะลึกหน้าจอระบบเงินกู้ (Loan Pages) แยกหมวดหมู่</title>
+<style>
+  :root {
+    --core: #2563eb; --aero: #ea580c; --ink: #1e293b; --muted: #64748b;
+    --border: #e2e8f0; --bg-alt: #f8fafc; --hdr: #1e3a5f; --accent: #eef2ff;
+    --calls: #7c3aed; --rules: #b45309;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: "Tahoma", "Segoe UI", "Noto Sans Thai", sans-serif; margin: 0; color: var(--ink); background: #f1f5f9; line-height: 1.7; }
+  header.top { background: linear-gradient(135deg, #1e3a5f, #2563eb); color: #fff; padding: 40px 24px; }
+  header.top h1 { margin: 0 0 8px; font-size: 26px; }
+  header.top p { margin: 0; opacity: .9; font-size: 14.5px; }
+  .layout { display: flex; max-width: 1400px; margin: 0 auto; }
+  nav.toc { width: 300px; flex-shrink: 0; position: sticky; top: 0; align-self: flex-start; max-height: 100vh; overflow-y: auto; padding: 24px 16px; border-right: 1px solid var(--border); font-size: 13.5px; background: #fff; }
+  nav.toc a { display: block; padding: 8px 10px; color: var(--ink); text-decoration: none; border-radius: 6px; margin-bottom: 2px; }
+  nav.toc a:hover { background: var(--accent); }
+  main { flex: 1; padding: 32px 40px; min-width: 0; background: #fff; }
+  section { margin-bottom: 56px; scroll-margin-top: 16px; }
+  h2 { font-size: 21px; border-bottom: 2px solid var(--hdr); padding-bottom: 10px; color: var(--hdr); }
+  p.cat-desc { color: var(--muted); font-size: 13.5px; margin-bottom: 20px; }
+  .page-card { border: 1px solid var(--border); border-radius: 10px; padding: 20px 24px; margin-bottom: 18px; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.04); }
+  .page-card h4 { margin: 0 0 2px; font-size: 15.5px; color: var(--hdr); }
+  .page-card code { background: #eef2f7; padding: 2px 7px; border-radius: 4px; font-family: Consolas, monospace; font-size: 14px; color: #b91c1c; }
+  .filename { color: var(--muted); font-size: 12px; margin: 0 0 10px; font-style: italic; }
+  .purpose { font-size: 14px; margin: 0 0 12px; }
+  .subsec { margin-bottom: 10px; }
+  .tag { display: inline-block; font-size: 11.5px; font-weight: 700; color: #fff; background: var(--hdr); padding: 2px 9px; border-radius: 999px; margin-bottom: 4px; }
+  .tag.calls { background: var(--calls); }
+  .tag.rules { background: var(--rules); }
+  .subsec ul { margin: 6px 0 0; padding-left: 22px; }
+  .subsec li { font-size: 13px; margin-bottom: 4px; }
+  .notable { margin-top: 10px; padding: 10px 14px; background: var(--accent); border-left: 3px solid var(--aero); font-size: 13px; border-radius: 0 6px 6px 0; }
+  .stat-badge { display: inline-block; background: rgba(255,255,255,.15); padding: 4px 12px; border-radius: 999px; font-size: 13px; margin-top: 10px; }
+  footer { padding: 24px 40px; color: var(--muted); font-size: 12.5px; border-top: 1px solid var(--border); background: #fff; }
+  @media (max-width: 900px) {
+    .layout { flex-direction: column; }
+    nav.toc { position: static; width: 100%; max-height: none; border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <h1>เจาะลึกหน้าจอ .NET ระบบเงินกู้ (Loan) — แยกหมวดหมู่</h1>
+  <p>วิเคราะห์ซอร์สโค้ดจริง (.aspx.cs) ของทุกหน้าจอในโฟลเดอร์ GCOOP/Saving/Applications/loan/ — Event Handlers, การเรียก Service/Backend, Business Rules, และจุดที่ hardcode เฉพาะสหกรณ์</p>
+  <span class="stat-badge">27 หน้าจอ · 6 หมวดหมู่</span>
+</header>
+
+<div class="layout">
+<nav class="toc">
+  <a href="#setup">A. ตั้งค่า / ข้อมูลหลัก (Setup & Master Data)</a><a href="#request">B. คำขอกู้ / อนุมัติ (Request &amp; Approval)</a><a href="#disburse">C. เบิกจ่าย / รับชำระ (Disbursement &amp; Repayment)</a><a href="#collateral">D. หลักประกัน (Collateral)</a><a href="#interest">E. ดอกเบี้ย / เงินคืน (Interest &amp; Money Return)</a><a href="#closeaudit">F. ปิดงวด / ตรวจสอบ / พิมพ์ (Period-close, Audit &amp; Print)</a>
+</nav>
+
+<main>
+
+<section id="intro">
+<h2>ภาพรวมวิธีการเรียก Backend ที่พบ (สังเคราะห์จากทุกหมวด)</h2>
+<p>จากการอ่านซอร์สโค้ดจริงทั้ง 27 หน้าจอ พบรูปแบบการเรียก backend 4 แบบปะปนกัน แม้แต่ในหน้าจอที่ดูคล้ายกัน (เช่นขึ้นต้นด้วย "proc_"):</p>
+<table>
+<thead><tr><th>รูปแบบ</th><th>ลักษณะ</th><th>ตัวอย่างหน้าจอ</th></tr></thead>
+<tbody>
+<tr><td><strong>WCF Synchronous</strong></td><td>เรียก <code>wcf.NLoan.*</code> / <code>wcf.NCommon.*</code> แล้วรอผลทันที เหมาะกับธุรกรรมที่ต้องการผลตอบกลับทันที</td><td>ws_lon_payment, ws_lon_apvloan, ws_lon_interestestim, ws_lon_keep_adjust</td></tr>
+<tr><td><strong>PBProcess Batch Queue</strong></td><td>เรียก <code>WebUtil.runProcessing/runProcessingExtend(state, "PROC_NAME", ...)</code> เขียนงานลง <code>cmprocessing</code> ให้ <code>PBProcess.exe</code> ทำงานแบบ asynchronous</td><td>ws_lon_prctrnpayin ("LNPOSTTRNPAYIN"), ws_lon_clsmth ("LNCLOSEMONTH"/"LNCALINTARRNEW"), ws_lon_cls_process_setmb_npl ("PROCSETARRMTHNPL"), ws_lon_proc_moneyreturn/paymoneyreturn</td></tr>
+<tr><td><strong>Self-hosted Background Task</strong></td><td>เรียก <code>runProcessingCappExtend</code> เพียงเพื่อเปิด log UI แล้วรัน logic จริงเองผ่าน <code>Task.Factory.StartNew()</code> ในเธรดของ IIS worker process — ไม่ผ่าน PBProcess.exe จริง</td><td>ws_lon_certificateinterest (รูปแบบเดียวที่พบ)</td></tr>
+<tr><td><strong>Direct SQL / DataSet CRUD</strong></td><td>ไม่เรียก service ใดๆ ทำงานผ่าน <code>ExecuteDataSource</code>/<code>WebUtil.QuerySdt</code>/<code>SQLFormat</code> ตรงๆ</td><td>หน้า master data ทั้งหมด (cfloantype, cfgrpgrtpermiss, ucfloancreditscoring), หน้าอนุมัติบางหน้า (apvonlinelimit, apvreqpauseloan, apvreqcompound — แม้ประกาศ WCF client field ไว้ก็ไม่ถูกเรียกใช้จริง), ws_lon_auditloan, ws_lon_proc_prinarrear_aero</td></tr>
+</tbody>
+</table>
+<p class="cat-desc">ข้อสังเกตสำคัญ: หน้าจอหลายหน้า "ประกาศ" ตัวแปร WCF service client (เช่น <code>n_loanClient loanService</code>) ไว้ในโค้ดแต่<strong>ไม่เคยเรียกใช้งานจริง</strong> — เป็น boilerplate จาก template ที่ไม่ได้ implement ให้ครบ เป็น dead code ที่พบซ้ำในหลายหน้าจอ</p>
+</section>
+
+
+<section id="setup">
+<h2>A. ตั้งค่า / ข้อมูลหลัก (Setup & Master Data)</h2>
+<p class="cat-desc">หน้าจอกำหนดค่าคงที่และเงื่อนไขพื้นฐานของระบบเงินกู้ ทั้งหมดในหมวดนี้ไม่มีการเรียก WCF service เลย ทำงานผ่าน raw SQL (ExecuteDataSource/WebUtil.QuerySdt) ล้วนๆ</p>
+
+<div class="page-card">
+  <h4><code>ws_lon_cfloantype_ctrl</code></h4>
+  <p class="filename">ws_lon_cfloantype.aspx.cs (817 บรรทัด)</p>
+  <p class="purpose">ตั้งค่า "ประเภทเงินกู้" (loan type master) — จอเดียวมี sub-DataSource ย่อยกว่า 20 ตัว ครอบคลุมเงื่อนไขดอกเบี้ย สิทธิ์วงเงิน หลักประกันที่ใช้ได้ เงื่อนไขหักกลบ ค่าปรับผิดนัด ช่วงผ่อนผัน</p>
+  <div class="subsec"><span class="tag">Event handlers / key methods</span><ul><li>InitJsPostBack — ผูก sub-DataSource กว่า 20 ตัวเข้ากับหน้า</li><li>CheckJsPostBack — switch ยาวรองรับ PostInsertRow/PostDelRow ของทุก grid ย่อย และ PostLoanTypeCode (โหลดข้อมูลทุกตารางย่อยพร้อมกันเมื่อเลือกประเภทใหม่)</li><li>SaveWebSheet — บันทึกลง ~15 ตาราง (LNLOANTYPECUSTOM, LNLOANTYPERIGHTCOLL, LNLOANTYPECOLLUSE ฯลฯ) แบบ delete-then-insert ต่อ loop</li></ul></div>
+  <div class="subsec"><span class="tag calls">Service / data calls</span><ul><li>ไม่มี WCF — raw SQL ผ่าน WebUtil.SQLFormat/QuerySdt, บันทึกผ่าน ExecuteDataSource ทั้งหมด</li></ul></div>
+  <div class="subsec"><span class="tag rules">Business rules / validation</span><ul><li>แทบไม่มี validation ฝั่ง C# — เป็นหน้า master data ล้วน มีแค่ logic แสดง/ซ่อน UI ตามเงื่อนไข เช่น colltype_code=="03" (เงินฝาก) จึงโชว์ตาราง dsDpcancoll</li></ul></div>
+  <div class="notable"><strong>Notable:</strong> ไม่พบ hardcode coop_id</div>
+</div>
+
+<div class="page-card">
+  <h4><code>ws_lon_cfgrpgrtpermiss_ctrl</code></h4>
+  <p class="filename">ws_lon_cfgrpgrtpermiss.aspx.cs (301 บรรทัด)</p>
+  <p class="purpose">กำหนดกฎการใช้สิทธิ์ค้ำประกันแบบกลุ่ม (group guarantor) — ผูกช่วงอายุ/หุ้น/เงินเดือน กับวงเงินค้ำสูงสุด และผูกว่าประเภทเงินกู้ใดใช้กฎกลุ่มนี้ได้</p>
+  <div class="subsec"><span class="tag">Event handlers / key methods</span><ul><li>CheckJsPostBack — PostNewRow/PostDelRow (เกณฑ์), PostNewRowList/PostDelRowlist (ประเภทเงินกู้ที่ผูก), PostLoanTypeCode (โหลดรายละเอียดพร้อม logic พิเศษสำหรับ MBTYPEPERM_STATUS 3/4)</li><li>SaveWebSheet — ลบ-แทรกใหม่ lncfgrpgrtpermdet และ LNCFGRPGRTPERMLNTYPE</li></ul></div>
+  <div class="subsec"><span class="tag calls">Service / data calls</span><ul><li>ไม่มี WCF — raw SQL ล้วน</li></ul></div>
+  <div class="subsec"><span class="tag rules">Business rules / validation</span><ul><li>Branch ตาม MBTYPEPERM_STATUS (3=กลุ่ม GRP, 4=เงินกู้ LON) กำหนดวิธีดึงรายการอนุญาตต่างกัน</li></ul></div>
+  <div class="notable"><strong>Notable:</strong> ไม่พบ hardcode coop_id</div>
+</div>
+
+<div class="page-card">
+  <h4><code>ws_lon_ucfloancreditscoring_ctrl</code></h4>
+  <p class="filename">ws_lon_ucfloancreditscoring.aspx.cs (67 บรรทัด — สั้นสุดในระบบ)</p>
+  <p class="purpose">ตั้งเกณฑ์ให้คะแนนเครดิต (credit scoring) เป็น grid ง่ายๆ เพิ่ม/ลบรายการพร้อมคะแนนเต็มต่อรายการ</p>
+  <div class="subsec"><span class="tag">Event handlers / key methods</span><ul><li>CheckJsPostBack — PostNewRow (insert พร้อม COOP_ID), PostDelRow</li><li>SaveWebSheet — ExecuteDataSource.AddRepeater(dsList)</li></ul></div>
+  <div class="subsec"><span class="tag calls">Service / data calls</span><ul><li>ไม่มี WCF — query ตาราง LNUCFCREDSCOLL ตรงๆ</li></ul></div>
+  <div class="subsec"><span class="tag rules">Business rules / validation</span><ul><li>ไม่มี validation ใดๆ</li></ul></div>
+  <div class="notable"><strong>Notable:</strong> ไม่พบ hardcode coop_id</div>
+</div>
+
+</section>
+
+<section id="request">
+<h2>B. คำขอกู้ / อนุมัติ (Request &amp; Approval)</h2>
+<p class="cat-desc">หน้ายื่นคำขอและอนุมัติ ครอบคลุมเงินกู้ปกติ พักชำระ และทบต้น ส่วนใหญ่ใช้ pattern สอง-ขั้นตอน (ยื่นคำขอ → อนุมัติ) แยกหน้าชัดเจน</p>
+
+<div class="page-card">
+  <h4><code>ws_lon_reqloan_ctrl</code></h4>
+  <p class="filename">ws_lon_reqloan.aspx.cs (3,909 บรรทัด — หน้าใหญ่ที่สุดในระบบ)</p>
+  <p class="purpose">หน้ายื่นคำขอกู้ของสมาชิกแบบครบวงจร: กรอกเลขสมาชิก → ตรวจสิทธิ์ → คำนวณวงเงิน/งวดผ่อน → จัดการหลักประกัน/คนค้ำ → หักกลบสัญญาเดิม → ซื้อประกัน/หุ้น → บันทึกใบคำขอ</p>
+  <div class="subsec"><span class="tag">Event handlers / key methods</span><ul><li>CheckJsPostBack — switch ~30 event</li><li>PostMemberNo (บรรทัด ~944-1410) — เมธอดหลัก ไล่ตรวจสอบสิทธิ์เป็นลำดับ 9 ขั้นก่อนคำนวณวงเงินกู้สูงสุดผ่าน lnClass.CalLoanCredit()</li><li>PostCalloanPermiss/PostSetColl — คำนวณวงเงินค้ำประกันคงเหลือ</li><li>SaveWebSheet (บรรทัด 355-737) — insert LNREQLOAN + repeater ของ dsLoanColl/dsLoanClr/dsLoanClrOth, lnreqloancredscroll, LNREQLOANPAYOUTEXPENSE</li></ul></div>
+  <div class="subsec"><span class="tag calls">Service / data calls</span><ul><li>wcf.NCommon.of_getnewdocno — ขอเลขที่เอกสาร</li><li>wcf.NLoan.of_computeinterest — ประมาณการดอกเบี้ย (เรียก 2 จุด)</li><li>wcf.NLoan.of_getcollpermiss — คำนวณวงเงินค้ำ (เรียกซ้ำ ~6 จุด)</li><li>wcf.NLoan.of_getcollusecontamt/_reqamt, of_isvalidcoll, of_checkcollmancount</li><li>LoanMasterClass (lnClass) — ชั้น business logic ฝั่ง .NET ล้วน (ไม่ผ่าน WCF): CalAge, CheckPauseLoan, CheckReqLoan, CalLoanCredit, CalPeriodPayment ฯลฯ</li></ul></div>
+  <div class="subsec"><span class="tag rules">Business rules / validation</span><ul><li>ไล่ตรวจสอบ 14 เงื่อนไขจริงในโค้ด: สถานะลาออก/งดกู้ทุกประเภท/งดกู้เฉพาะประเภท, ใบคำขอค้างเดิม, ผิดนัดชำระใน kparrearreceive, อายุ/งวดหุ้นตาม MBTIME_TYPE, วงเงินรวมไม่เกิน MAXALLLOAN_AMOUNT (ยกเว้นประเภท "45"), ลดวงเงินเหลือ 90% สำหรับประเภท "2D", งวดพิเศษสำหรับประเภท "03", คำนวณงวดตามเกษียณ (RETIRELOANSEND_TYPE), ปฏิเสธบันทึกซ้ำถ้า LOANREQUEST_STATUS==1 (อนุมัติแล้ว), บังคับจำนวนคนค้ำครบตาม lnloantypereqgrt</li></ul></div>
+  <div class="notable"><strong>Notable:</strong> coop "069001" มี logic พิเศษเปลี่ยนแผนประกันอัตโนมัติ (PostChgBuyIns) — loan-type code "2D"/"03"/"45" hardcode ฝังตรงในโค้ด</div>
+</div>
+
+<div class="page-card">
+  <h4><code>ws_lon_apvloan_ctrl</code></h4>
+  <p class="filename">ws_lon_apvloan.aspx.cs (529 บรรทัด)</p>
+  <p class="purpose">อนุมัติคำขอกู้ — ค้นหารายการตามเงื่อนไข ติ๊กเลือกอนุมัติเป็นชุด ออกเลขที่สัญญาอัตโนมัติ</p>
+  <div class="subsec"><span class="tag">Event handlers / key methods</span><ul><li>PostSearch/PostGenContNo→GenContNo()/PostRetime</li><li>SaveWebSheet — รวบแถวที่ผ่านเงื่อนไขเป็น string เดียวส่งเข้า service อนุมัติทั้งชุด</li><li>PostupClrintreq — อัปเดตดอกเบี้ยหักกลับตามวันอนุมัติจริง</li><li>PostGenReqInsDOH — สร้างคำขอเปลี่ยนแผนประกัน (เฉพาะ flow coop 056001)</li></ul></div>
+  <div class="subsec"><span class="tag calls">Service / data calls</span><ul><li>wcf.NLoan.of_saveapv_lnreq — service call หลักที่อนุมัติจริง (ส่ง string รวมทุกแถว)</li><li>wcf.NLoan.of_gennewcontractno — ออกเลขสัญญาใหม่</li><li>wcf.NLoan.of_computeinterest — ใช้ใน PostupClrintreq</li></ul></div>
+  <div class="subsec"><span class="tag rules">Business rules / validation</span><ul><li>ถ้าบันทึกไม่สำเร็จ rollback SAVE_FLAG กลับเป็น 0 ทุกแถว</li><li>Jschklastdocnonew (ตรวจเลขสัญญาต่อเนื่อง) ปัจจุบันถูก disable ด้วย early return 1</li></ul></div>
+  <div class="notable"><strong>Notable:</strong> coop "056001" (คอมเมนต์ "สอ.กรมทางหลวง") มี flow พิเศษ 3 ขั้นตอนหลังอนุมัติสำเร็จ: อัปเดตดอกเบี้ยหักกลับ + สร้างคำขอเปลี่ยนแผนประกัน + พิมพ์ใบสั่งจ่าย PDF เฉพาะสหกรณ์นี้เท่านั้น</div>
+</div>
+
+<div class="page-card">
+  <h4><code>ws_lon_apvonlinelimit_ctrl</code></h4>
+  <p class="filename">ws_lon_apvonlinelimit.aspx.cs (129 บรรทัด)</p>
+  <p class="purpose">toggle flag การรับเงินกู้ผ่านช่องทางออนไลน์ (rcvonline_flag) ต่อสัญญา</p>
+  <div class="subsec"><span class="tag">Event handlers / key methods</span><ul><li>PostSearch (filter เหลือแค่เลขสมาชิก ฟิลด์อื่นถูก comment ปิด)</li><li>SaveWebSheet — loop update lncontmaster.rcvonline_flag ทีละแถว</li></ul></div>
+  <div class="subsec"><span class="tag calls">Service / data calls</span><ul><li>ประกาศ n_loanClient loanService แต่ไม่ถูกเรียกใช้จริง (dead field) — บันทึกจริงผ่าน raw SQL update ตรงๆ</li></ul></div>
+  <div class="subsec"><span class="tag rules">Business rules / validation</span><ul><li>ไม่มี validation ก่อนบันทึกเลย เป็นแค่ toggle ธรรมดา</li></ul></div>
+  <div class="notable"><strong>Notable:</strong> ไม่พบ hardcode coop_id</div>
+</div>
+
+<div class="page-card">
+  <h4><code>ws_lon_reqpauseloan_ctrl + ws_lon_apvreqpauseloan_ctrl</code></h4>
+  <p class="filename">ws_lon_reqpauseloan.aspx.cs (232) + ws_lon_apvreqpauseloan.aspx.cs (211)</p>
+  <p class="purpose">คำขอ/อนุมัติ งดส่งชำระเงินกู้บางประเภท (pause) — สมาชิกระบุยอดสูงสุดที่ขอพักต่อประเภทเงินกู้ แล้วเจ้าหน้าที่อนุมัติเป็นชุด</p>
+  <div class="subsec"><span class="tag">Event handlers / key methods</span><ul><li>ฝั่งคำขอ: PostReadData (query lnmembpauseloan เติมค่าที่เคยขอไว้), PostZero, PostSetfilterrow, SaveWebSheet (insert LNREQPAUSELOAN status=8 + LNREQPAUSELOANDET)</li><li>ฝั่งอนุมัติ: PostSearch, JsPostWait/Approve/Cancel (ตั้งสถานะ 8/1/-1 ทั้งชุด), SaveWebSheet (ลบ LNMEMBPAUSELOAN เดิมทั้งหมดแล้ว insert ใหม่ — full replace ไม่ใช่ merge)</li></ul></div>
+  <div class="subsec"><span class="tag calls">Service / data calls</span><ul><li>ฝั่งคำขอ: wcf.NCommon.of_getnewdocno (แยก path ตาม Sta.IS_OLEDB_MODE — Oracle ใช้ WCF, SQL Server ใช้ WebUtil.GetLastDocumentNo local)</li><li>ฝั่งอนุมัติ: ประกาศ n_loanClient loanService แต่ไม่ถูกเรียกใช้จริงเช่นกัน — raw SQL ล้วน</li></ul></div>
+  <div class="subsec"><span class="tag rules">Business rules / validation</span><ul><li>บันทึกด้วย REQUEST_STATUS=8 (รออนุมัติ) เสมอ ไม่มี validation อื่น</li><li>การอนุมัติเป็น full-replace pattern ต้องระวังถ้าสมาชิกมีหลายคำขอพร้อมกัน</li></ul></div>
+  <div class="notable"><strong>Notable:</strong> ไม่พบ hardcode coop_id ทั้งคู่</div>
+</div>
+
+<div class="page-card">
+  <h4><code>ws_lon_reqcompound_ctrl + ws_lon_apvreqcompound_ctrl</code></h4>
+  <p class="filename">ws_lon_reqcompound.aspx.cs (433) + ws_lon_apvreqcompound.aspx.cs (292)</p>
+  <p class="purpose">คำขอ/อนุมัติผ่อนผันทบต้น (compound) — ปรับโครงสร้างงวดชำระ ระบุจำนวนงวด/วันครบกำหนดใหม่/ยอดชำระใหม่</p>
+  <div class="subsec"><span class="tag">Event handlers / key methods</span><ul><li>ฝั่งคำขอ: PostMemberNo, PostReturnValue (pre-fill ค่าทบต้นปัจจุบันเมื่อติ๊กเลือกสัญญา), JsPostMonth (คำนวณวันครบกำหนดใหม่ = วันที่ขอ+จำนวนงวด ปรับเป็นวันสุดท้ายเดือน), SaveWebSheet (insert LNREQADJUSTCONT type="CM" + LNREQCOMPOUND เก็บค่า BF*/COMP_* คู่กันเพื่อ audit)</li><li>ฝั่งอนุมัติ: SaveWebSheet — update lncontmaster จริง (compound_status/period/duedate/paytype ฯลฯ) เฉพาะแถวที่ reqadust_status==1</li></ul></div>
+  <div class="subsec"><span class="tag calls">Service / data calls</span><ul><li>ไม่มี WCF ในฝั่งคำขอ — raw SQL + WebUtil.GetLastDocumentNo("LNREQCOMPOUND")</li><li>ฝั่งอนุมัติ: ประกาศ loanService แต่ไม่ใช้จริง — มี checkData() query ALL_TAB_COLUMNS (Oracle system catalog) เช็คว่าตาราง/คอลัมน์มีจริงก่อนใช้งาน (defensive coding รองรับ schema ต่างกันข้ามสหกรณ์)</li></ul></div>
+  <div class="subsec"><span class="tag rules">Business rules / validation</span><ul><li>ประเภทธุรกรรมสองแบบในหน้าเดียว: choose_flag==1→type "COM" (ทำผ่อนผัน), ยกเลิกที่มีอยู่→type "CCL"</li><li>ถ้า app_status==1 (ผู้กรอกมีสิทธิ์อนุมัติเอง) จะ update lncontmaster ทันทีไม่ต้องรอ approve แยก</li></ul></div>
+  <div class="notable"><strong>Notable:</strong> ไม่พบ hardcode coop_id ตรงๆ — มี dynamic schema check ที่บ่งชี้ปัญหา schema variance ข้ามสหกรณ์</div>
+</div>
+
+</section>
+
+<section id="disburse">
+<h2>C. เบิกจ่าย / รับชำระ (Disbursement &amp; Repayment)</h2>
+<p class="cat-desc">หมวดที่มีความหลากหลายของรูปแบบการเรียก backend มากที่สุด — พบทั้ง WCF synchronous, batch queue asynchronous, และ direct SQL insert ปนกันในหน้าเดียวกันบางหน้า</p>
+
+<div class="page-card">
+  <h4><code>ws_lon_rcvloan_ctrl</code></h4>
+  <p class="filename">ws_lon_rcvloan.aspx.cs (540 บรรทัด)</p>
+  <p class="purpose">หน้าค้นหา/แสดงรายการคำขอกู้ที่รอเบิกจ่าย พร้อมพิมพ์ใบสำคัญจ่าย — <strong>ไม่มีการบันทึกข้อมูลจริงในไฟล์นี้เลย</strong> (SaveWebSheet ว่างเปล่า) การบันทึกจริงอยู่ที่ dialog แยก wd_lon_rcvlon_ctrl</p>
+  <div class="subsec"><span class="tag">Event handlers / key methods</span><ul><li>PostSearch, PostOperateFlag (ไฮไลท์แถวที่เลือก), PostPrintRcvSlip/22/PostPrintSlip (พิมพ์ผ่าน iReportBuider)</li><li>GetFormPrint/GetFormPA — query lnloanconstant/paprintingmaster หาชื่อ report ตาม coop</li></ul></div>
+  <div class="subsec"><span class="tag calls">Service / data calls</span><ul><li>ไม่มี WCF save — เฉพาะ WebUtil.QuerySdt/Query และ iReportBuider พิมพ์ PDF</li></ul></div>
+  <div class="subsec"><span class="tag rules">Business rules / validation</span><ul><li>loantype_code=="16" (เงินกู้ EGAT/ATM) สลับไปใช้ report object พิเศษ ir_sl_slippayout_egat_main_atm</li></ul></div>
+  <div class="notable"><strong>Notable:</strong> บันทึกจริงเกิดที่ dialog wd_lon_rcvlon.aspx.cs (มีการเรียก of_saveslip_lnrcv จริงที่นั่น) — คอมเมนต์เก่าอ้างถึง coop "028001"/"035001"</div>
+</div>
+
+<div class="page-card">
+  <h4><code>ws_lon_payment_ctrl</code></h4>
+  <p class="filename">ws_lon_payment.aspx.cs (2,560+ บรรทัด — หน้าหลักซับซ้อนที่สุดในหมวดนี้)</p>
+  <p class="purpose">รับชำระหนี้เงินกู้แบบ interactive ณ เคาน์เตอร์ — กรอกเลขสมาชิก ระบบคำนวณ/ดึงยอดค้างของหุ้น/เงินกู้/รายการอื่น พร้อมยอดเงินสด/ธนาคาร แล้วบันทึกใบเสร็จทั้งชุดในธุรกรรมเดียว</p>
+  <div class="subsec"><span class="tag">Event handlers / key methods</span><ul><li>PostMemberNo — จุดเริ่มหลัก ตรวจ token กันทำซ้ำ, ตรวจค้างชำระรายเดือน แยกเส้นทาง InitLnRcv()/InitLnRcvKeepArrear()</li><li>CheckBuySPX/CheckCountSPM — ตรวจสิทธิ์/กันซื้อหุ้นพิเศษซ้ำ</li><li>of_setloanfilepayment — สร้างรายการค่าปรับผิดนัด (FLE) อัตโนมัติ</li><li>ReCalint — คำนวณดอกเบี้ยค้างใหม่ พร้อมเช็ควันทำการ</li><li>SaveWebSheet — จุดบันทึกจริง</li></ul></div>
+  <div class="subsec"><span class="tag calls">Service / data calls</span><ul><li>wcf.NLoan.of_saveslip_payin — synchronous call-and-wait หลัก (XML 5 ส่วน: head/share/loan/etc/expense)</li><li>หลังบันทึก: WebUtil.runProcessingFin(state) — ยิง batch process การเงินต่ออัตโนมัติ (asynchronous)</li><li>wcf.NLoan.of_initslippayin, of_calfeeloanpayment, of_initslippayin_recalint, wcf.NCommon.of_isworkingdate/of_getnextworkday</li></ul></div>
+  <div class="subsec"><span class="tag rules">Business rules / validation</span><ul><li>coop "080001" ต้องเปิดวันทำการระบบการเงินก่อน ไม่งั้น block</li><li>moneytype=CSH ต้องเปิดลิ้นชักเก็บเงินสดก่อน (WebUtil.of_is_teller)</li><li>กัน double-transaction ข้ามเครื่องด้วย token (UseMembUptoToken)</li><li>ตรวจเพดานถือหุ้นพิเศษ (shsharetypespxrate) และกันซื้อซ้ำในเดือนเดียวกัน</li><li>alert เกินกำหนดวันที่ 7 ของเดือน (เกี่ยวกับดอกเบี้ยค้าง)</li></ul></div>
+  <div class="notable"><strong>Notable:</strong> คอมเมนต์ "AERO ตรวจสอบสิทธิ์การซื้อหุ้นพิเศษ" ที่ CheckBuySPX — ฟีเจอร์นี้เป็นของ AERO โดยเฉพาะ · coop "050001" (กรมป่าไม้) ห้ามแก้ไขยอดดอกเบี้ยที่ชำระ (hardcode เฉพาะสหกรณ์) · ปีบัญชี hardcode "2568" ผูกกับยอดชำระฌาปนกิจ</div>
+</div>
+
+<div class="page-card">
+  <h4><code>ws_lon_post_loan_receive_ctrl</code></h4>
+  <p class="filename">ws_lon_post_loan_receive.aspx.cs (681 บรรทัด)</p>
+  <p class="purpose">ผ่านรายการ/โพสต์เบิกจ่ายเงินกู้จริง — ดึงรายการ slslippayout ที่ยังไม่ผ่านรายการมาให้เลือกแล้วโพสต์เข้าระบบบัญชี (จุดที่เรียก service เบิกเงินกู้จริงของทั้งระบบ ต่อจากหน้า rcvloan ที่เป็นแค่หน้าค้นหา)</p>
+  <div class="subsec"><span class="tag">Event handlers / key methods</span><ul><li>PostShowDataGroupEntry — สร้าง dynamic SQL where-clause จากหลายเงื่อนไข</li><li>LoopSave — จุดบันทึกจริง วนลูปแถวที่ OPERATE_FLAG==1 ข้ามแถวซ้ำ</li><li>PrintSlippayout/PrintSlippayin — พิมพ์ผ่าน Printing.PrintAppletPB (PB applet เดิม ไม่ใช่ iReport)</li></ul></div>
+  <div class="subsec"><span class="tag calls">Service / data calls</span><ul><li>wcf.NLoan.of_saveslip_postlnrcv(SsWsPass, SsCoopId, payoutslip_no, SsCoopControl) — WCF synchronous หลัก แล้ว update slslippayout.lotpay_seqno + lnreqloan.loanrequest_status=1 ด้วย raw SQL</li></ul></div>
+  <div class="subsec"><span class="tag rules">Business rules / validation</span><ul><li>กันบันทึกซ้ำ payoutslip_no เดียวกันในลูป</li><li>sliptype "LRT" ยังไม่มี logic รองรับจริง (LoopLrt มีแต่โครง)</li></ul></div>
+  <div class="notable"><strong>Notable:</strong> shrlontype_code=="10" (เงินกู้ฉุกเฉิน) ใช้ report แยก sl_slip_payout_emer</div>
+</div>
+
+<div class="page-card">
+  <h4><code>ws_loan_contestpayment_ctrl</code></h4>
+  <p class="filename">ws_loan_contestpayment.aspx.cs (865 บรรทัด)</p>
+  <p class="purpose"><strong>ไม่ใช่หน้า "โต้แย้งการชำระเงิน" ตามชื่อ</strong> — แท้จริงเป็นเครื่องมือสร้างตารางประมาณการชำระหนี้ (amortization schedule) ให้สมาชิกดูล่วงหน้าก่อนพิมพ์ PDF</p>
+  <div class="subsec"><span class="tag">Event handlers / key methods</span><ul><li>PostTypePayment — คำนวณยอดผ่อนตาม payment_type (1=คงต้น, 2=ต้น+ดอกเท่ากัน)</li><li>PostPeriodPayment — คำนวณจำนวนงวดย้อนกลับจากยอดผ่อนที่กรอก</li><li>PostGen→GenTable() — สร้างตารางประมาณการทีละงวด insert เข้า staging table lnestloanpayment</li><li>JsRoundMoney/TruncateDecimal — logic ปัดเศษเงินหลายรูปแบบ</li></ul></div>
+  <div class="subsec"><span class="tag calls">Service / data calls</span><ul><li>wcf.NLoan.of_calperiodpay — synchronous คำนวณยอดผ่อนแบบมี progress rate</li><li>SaveWebSheet ว่างเปล่า — ยืนยันว่าไม่มีการ commit ธุรกรรมทางการเงินจริงจากหน้านี้</li></ul></div>
+  <div class="subsec"><span class="tag rules">Business rules / validation</span><ul><li>fallback ดอกเบี้ย default 4.5% ถ้า ldc_intrate==0</li><li>logic progress rate ปรับยอดผ่อนทุก 12 งวด สำหรับเงินกู้แบบ step-up</li></ul></div>
+  <div class="notable"><strong>Notable:</strong> ไม่พบ hardcode coop_id — เป็น logic คำนวณทั่วไป</div>
+</div>
+
+<div class="page-card">
+  <h4><code>ws_lon_prctrnpayin_ctrl</code></h4>
+  <p class="filename">ws_lon_prctrnpayin.aspx.cs (157 บรรทัด)</p>
+  <p class="purpose">ประมวลผลรายการนำเข้าชำระหนี้จากระบบภายนอก (sltranspayin, source เช่นบิล/หักเงินเดือน) — สั่ง post เข้าระบบบัญชีจริง</p>
+  <div class="subsec"><span class="tag">Event handlers / key methods</span><ul><li>PostCheck→retreivedata() — query sltranspayin join mbmembmaster กรอง post_status=0</li><li>PostProc — จุดประมวลผลจริง export XML แล้วยิง batch</li><li>PostPrint — พิมพ์ผ่าน Printing.PrintSlipSlpayin (PB applet)</li></ul></div>
+  <div class="subsec"><span class="tag calls">Service / data calls</span><ul><li>&lt;strong&gt;WebUtil.runProcessingExtend(state, "LNPOSTTRNPAYIN", xml, "", "", "")&lt;/strong&gt; — เคสเดียวในหมวดนี้ที่ใช้ batch queue asynchronous ชัดเจน (ยืนยัน pattern cmprocessing/PBProcess)</li></ul></div>
+  <div class="subsec"><span class="tag rules">Business rules / validation</span><ul><li>กรองเฉพาะ post_status=0</li><li>แยก query 2 แบบตาม Sta.IS_OLEDB_MODE (SQL Server vs Oracle syntax)</li><li>silent catch ที่ WebSheetLoadBegin อาจกลืน error การสร้างเลขเอกสาร</li></ul></div>
+  <div class="notable"><strong>Notable:</strong> source_system="BIL" default บ่งชี้ integration กับระบบหักบัญชีเงินเดือนภายนอก</div>
+</div>
+
+<div class="page-card">
+  <h4><code>ws_lon_imp_data_pay_ctrl</code></h4>
+  <p class="filename">ws_lon_imp_data_pay.aspx.cs (251 บรรทัด)</p>
+  <p class="purpose">นำเข้าข้อมูลชำระหนี้จากไฟล์ Excel (.xlsx) แล้วนำเข้าสู่ sltranspayin เพื่อรอชำระต่อในหน้า ws_lon_payment</p>
+  <div class="subsec"><span class="tag">Event handlers / key methods</span><ul><li>ClickImport — อ่านไฟล์ด้วย EPPlus (OfficeOpenXml) column 1-5 บังคับนามสกุล .xlsx</li><li>ClickProcess — จุดประมวลผลหลัก ตรวจสัญญามีจริงใน lncontmaster แล้ว insert ตรงลง sltranspayin</li><li>ClickCalintProcess — คำนวณดอกเบี้ยแยกจากยอดรวมที่ import</li></ul></div>
+  <div class="subsec"><span class="tag calls">Service / data calls</span><ul><li>ClickProcess: &lt;strong&gt;direct ADO insert ไม่ผ่าน WCF เลย&lt;/strong&gt; (transitem_code="LON", sliptype_code="PX", post_status=0)</li><li>ClickCalintProcess: wcf.NLoan.of_compstmtinterest — synchronous คำนวณดอกเบี้ยจริงตามระบบ</li></ul></div>
+  <div class="subsec"><span class="tag rules">Business rules / validation</span><ul><li>บล็อกทั้ง process ถ้าไม่พบสัญญาใน lncontmaster</li><li>คำนวณ running seq_no ต่อสมาชิกต่อวันกันเลขซ้ำ</li><li>error message โชว์ SQL ที่ error ตรงๆ ให้ผู้ใช้เห็น (information disclosure เล็กน้อย)</li><li>รองรับ import_type "BPL" (เปลี่ยน systemcode)</li></ul></div>
+  <div class="notable"><strong>Notable:</strong> ไม่พบ hardcode coop_id — ใช้ร่วมกับหลายสหกรณ์ที่มีระบบหักเงินเดือน/บิลภายนอก</div>
+</div>
+
+</section>
+
+<section id="collateral">
+<h2>D. หลักประกัน (Collateral)</h2>
+<p class="cat-desc">หน้าจัดการหลักประกันประเภทจับต้องได้ (จำนอง) ทั้งหมดในหมวดนี้ไม่เรียก n_cst_loansrv_collpermiss โดยตรง — เป็นเพียง sub-classification ภายใต้หมวดใหญ่ "04 จำนอง" ของ collpermiss เท่านั้น</p>
+
+<div class="page-card">
+  <h4><code>ws_lon_collateral_master_ctrl</code></h4>
+  <p class="filename">ws_lon_collateral_master.aspx.cs (778 บรรทัด)</p>
+  <p class="purpose">บันทึก/แก้ไขหลักประกันอสังหาริมทรัพย์ (ที่ดิน/สิ่งปลูกสร้าง/ห้องชุด/สิทธิเช่า) ลง lncollmaster พร้อมตารางลูกตามประเภท</p>
+  <div class="subsec"><span class="tag">Event handlers / key methods</span><ul><li>Collmastgrp_Changed — สลับ Panel1-5 และ label ราคาตาม COLLMAST_TYPE ("01"-"05")</li><li>CheckJsPostBack — โหลดข้อมูลสมาชิก, หลักประกันเดิม, เพิ่ม/ลบแถวสิ่งปลูกสร้าง/ผู้มีกรรมสิทธิ์, cascading dropdown จังหวัด/อำเภอ/ตำบลหลายชุด</li><li>SaveWebSheet — สร้าง/อัปเดต lncollmaster + ลบ-แทรก lncollmastbuilding/prop/memco ตามประเภท</li></ul></div>
+  <div class="subsec"><span class="tag calls">Service / data calls</span><ul><li>ไม่มี WCF NLoan — DataSet-bound CRUD (ExecuteDataSource) + raw SQL</li><li>ขอเลขที่เอกสารผ่าน WebUtil.GetLastDocumentNo("COLLMASTER") พร้อม loop เช็คเลขซ้ำเอง</li></ul></div>
+  <div class="subsec"><span class="tag rules">Business rules / validation</span><ul><li>COLLMAST_TYPE 5 ค่า (01=ที่ดิน,02=สิ่งปลูกสร้าง,03=ห้องชุด,04=รวม,05=สิทธิเช่า) ควบคุม panel/label</li><li>บันทึกแล้วตั้ง collmast_status=1, redeem_flag=1 เสมอ</li><li>รองรับ dual-mode DB (Sta.IS_OLEDB_MODE) — SQL แยก SQL Server/Oracle</li></ul></div>
+  <div class="notable"><strong>Notable:</strong> ไม่พบ hardcode coop_id เฉพาะ</div>
+</div>
+
+<div class="page-card">
+  <h4><code>ws_lon_collateral_car_ctrl</code></h4>
+  <p class="filename">ws_lon_collateral_car.aspx.cs (130 บรรทัด)</p>
+  <p class="purpose">บันทึก/แก้ไขหลักประกันประเภทรถยนต์ (chattel mortgage) ลงตาราง LNCOLLCARMASTER แยกต่างหาก — ไม่ผูกกับ COLLMAST_TYPE classification ของหน้า master เลย</p>
+  <div class="subsec"><span class="tag">Event handlers / key methods</span><ul><li>PostMemno — ค้นหาสมาชิก+รายการรถทั้งหมด</li><li>PostCollcare — โหลดรายละเอียดรถที่เลือก</li><li>PostInsertRowCar — เพิ่มรถใหม่ พร้อม validate ต้องกรอกเลขสมาชิกก่อน (JS alert)</li></ul></div>
+  <div class="subsec"><span class="tag calls">Service / data calls</span><ul><li>wcf.NCommon.of_getnewdocno(..., "CARMASTNO") — WCF call เดียวที่พบในหน้านี้ ขอเลขที่เอกสารรถใหม่</li><li>CRUD ผ่าน ExecuteDataSource.AddFormView</li></ul></div>
+  <div class="subsec"><span class="tag rules">Business rules / validation</span><ul><li>ใช้ sentinel "AUTO" ใน COLLMAST_NO บอกว่าต้องขอเลขใหม่ตอน save</li></ul></div>
+  <div class="notable"><strong>Notable:</strong> ใช้ coop id 2 รูปแบบต่างบริบท (SsCoopControl สำหรับ field, SsCoopIdXslip สำหรับขอเลขเอกสาร) แต่ไม่ hardcode ค่าตายตัว</div>
+</div>
+
+<div class="page-card">
+  <h4><code>ws_lon_reprnmortgage_ctrl</code></h4>
+  <p class="filename">ws_lon_reprnmortgage.aspx.cs (741 บรรทัด)</p>
+  <p class="purpose">พิมพ์ซ้ำเอกสารจำนองราชการหลายชนิด (ทด.1, ทด.1ก, ทด.15, ทด.21, ท.อ.9, อ.ช.15/16, หนังสือยินยอมหักเงิน, หนังสือไถ่ถอนจำนอง ฯลฯ) จากข้อมูลหลักประกันที่มีอยู่แล้ว</p>
+  <div class="subsec"><span class="tag">Event handlers / key methods</span><ul><li>PostMrtgNo — โหลดรายละเอียดหลักประกันทั้งหมด พร้อม cascading dropdown จังหวัด→อำเภอ→ตำบลหลายชุด</li><li>of_printtd1/td15/td1k/... (13 ฟังก์ชันพิมพ์) — เรียก SaveCollmast() ก่อนเสมอ แล้วสร้างรายงาน RTF+PDF</li><li>SaveCollmast/SaveWebSheet — โค้ดซ้ำกันเกือบ 100%</li></ul></div>
+  <div class="subsec"><span class="tag calls">Service / data calls</span><ul><li>ไม่มี WCF — raw SQL UPDATE lncollmaster ต่อ string โดยตรง (บางค่า mrtger/autz ไม่ผ่าน parameter binding เต็มรูปแบบ)</li><li>iReportBuider สร้างเอกสาร RTF/PDF จาก template ชื่อ r_book_loan_*_aero</li></ul></div>
+  <div class="subsec"><span class="tag rules">Business rules / validation</span><ul><li>ทุกปุ่มพิมพ์: บันทึกก่อนเสมอ → สร้างรายงาน 2 แบบ (rtf+pdf) → AutoOpenPDF=true</li></ul></div>
+  <div class="notable"><strong>Notable:</strong> ชื่อ report ทุกตัวลงท้าย "_aero" (convention เฉพาะ AERO instance) · พบ <strong>hardcode coop_id='050001'</strong> ในเงื่อนไข join ของ mbmembfamily ฝั่ง Oracle (แม้ฟังก์ชันที่เรียกจะถูก comment ปิดอยู่ในปัจจุบัน)</div>
+</div>
+
+</section>
+
+<section id="interest">
+<h2>E. ดอกเบี้ย / เงินคืน (Interest &amp; Money Return)</h2>
+<p class="cat-desc">หมวดนี้มีรูปแบบการเรียก backend หลากหลายที่สุด — พบครบทั้ง WCF sync, PBProcess batch queue, และรูปแบบที่ 3 คือ "self-hosted background task" ที่รัน logic เองใน IIS worker process</p>
+
+<div class="page-card">
+  <h4><code>ws_lon_interestestim_ctrl</code></h4>
+  <p class="filename">ws_lon_interestestim.aspx.cs (228 บรรทัด)</p>
+  <p class="purpose">สร้างใบนำฝากประเภท "PX" สำหรับประมาณการดอกเบี้ยที่จะชำระล่วงหน้า</p>
+  <div class="subsec"><span class="tag">Event handlers / key methods</span><ul><li>PostMemberNo→of_initslippayin()</li><li>PostOperateFlag — toggle เปิด/ปิดชำระต้น/ดอกเบี้ยต่อแถว</li><li>PostOperateDate — recalc ดอกเบี้ยใหม่ทั้งชุดตามวันที่</li></ul></div>
+  <div class="subsec"><span class="tag calls">Service / data calls</span><ul><li>wcf.NLoan.of_initslippayin, of_initslippayin_recalint, of_computeinterest3 (คำนวณเบี้ยปรับด้วย fine table "ZF001") — WCF synchronous ล้วน</li></ul></div>
+  <div class="subsec"><span class="tag rules">Business rules / validation</span><ul><li>OPERATE_FLAG==1 → เต็มยอดต้นคงเหลือ, คำนวณเบี้ยปรับเฉพาะเมื่อมี prinarrear_amt&gt;0 ที่ payarrear_status=8</li></ul></div>
+  <div class="notable"><strong>Notable:</strong> ไม่พบ hardcode coop_id</div>
+</div>
+
+<div class="page-card">
+  <h4><code>ws_lon_certificateinterest_ctrl</code></h4>
+  <p class="filename">ws_lon_certificateinterest.aspx.cs (333 บรรทัด)</p>
+  <p class="purpose">ออกหนังสือรับรองดอกเบี้ยเงินกู้ประจำปี (ลดหย่อนภาษี) — สรุปดอกเบี้ยที่ชำระในรอบปีบัญชีลง lnsumintcert</p>
+  <div class="subsec"><span class="tag">Event handlers / key methods</span><ul><li>Postprocess→CalIntprocess()→runObjectProcessing()→runPostProcess() — ทำงานจริง ลบข้อมูลเดิมแล้วสรุปดอกเบี้ยใหม่จาก lncontstatement join lncontmaster/lnloantype</li></ul></div>
+  <div class="subsec"><span class="tag calls">Service / data calls</span><ul><li>&lt;strong&gt;รูปแบบผสม (hybrid)&lt;/strong&gt;: เรียก WebUtil.runProcessingCappExtend(...,"runPostProcess",...) เพียงเพื่อเปิด log/progress UI เท่านั้น แล้วสั่ง Task.Factory.StartNew() รัน logic จริงในเธรดพื้นหลังของ ASP.NET เอง — ไม่ได้ส่งงานไปให้ PBProcess.exe ทำแบบ async ผ่าน cmprocessing จริง</li></ul></div>
+  <div class="subsec"><span class="tag rules">Business rules / validation</span><ul><li>ลบ lnsumintcert ของปีนั้นก่อนคำนวณใหม่ทุกครั้ง (recalculate-and-replace)</li><li>แปลง พ.ศ.→ค.ศ. จาก cmaccountyear</li><li>มี SQL DDL/migration ค้างอยู่ใน comment (ไม่ใช่ production logic)</li></ul></div>
+  <div class="notable"><strong>Notable:</strong> ไม่พบ hardcode coop_id</div>
+</div>
+
+<div class="page-card">
+  <h4><code>ws_lon_proc_moneyreturn_ctrl</code></h4>
+  <p class="filename">ws_lon_proc_moneyreturn.aspx.cs (93 บรรทัด)</p>
+  <p class="purpose">ประมวลผลขั้นที่ 1 ของ "ดอกเบี้ยคืน" — ล้างค่า interest_return เดิมแล้วส่งเข้าคิว batch ตั้งยอดคืนใหม่</p>
+  <div class="subsec"><span class="tag">Event handlers / key methods</span><ul><li>ProcMoneyreturn() — reset interest_return=0 (synchronous SQL) แล้วยิง batch</li></ul></div>
+  <div class="subsec"><span class="tag calls">Service / data calls</span><ul><li>update lncontmaster set interest_return=0 ... (synchronous SQL ตรง)</li><li>&lt;strong&gt;WebUtil.runProcessing(state, "PROCSETINTRETURNNOTPOST", ...)&lt;/strong&gt; — batch queue (บรรทัด runProcessingExtend รุ่นเก่าถูก comment ปิดไว้ ปัจจุบันใช้ runProcessing ธรรมดา)</li></ul></div>
+  <div class="subsec"><span class="tag rules">Business rules / validation</span><ul><li>SQL คำนวณ interest_return กรณีสัญญางดต้น ถูก comment ปิดทั้งหมด — เหลือแค่ reset เป็น 0 ก่อนส่งเข้า batch</li></ul></div>
+  <div class="notable"><strong>Notable:</strong> ไม่พบ hardcode coop_id</div>
+</div>
+
+<div class="page-card">
+  <h4><code>ws_lon_proc_paymoneyreturn_ctrl</code></h4>
+  <p class="filename">ws_lon_proc_paymoneyreturn.aspx.cs (72 บรรทัด)</p>
+  <p class="purpose">ประมวลผลขั้นที่ 2 ต่อจาก moneyreturn — "จ่าย" ดอกเบี้ยคืนที่ตั้งไว้ พร้อม post statement และสรุปยอดจ่าย</p>
+  <div class="subsec"><span class="tag">Event handlers / key methods</span><ul><li>JsRetriveData→dsList.RetrieveList — แสดงรายการรอจ่ายคืน</li><li>ProcPayMoneyreturn() — ส่งเข้า batch</li></ul></div>
+  <div class="subsec"><span class="tag calls">Service / data calls</span><ul><li>&lt;strong&gt;WebUtil.runProcessingExtend(state, "POSTINTRETPAYOUT_POSTSTM_SUMPAY", ...)&lt;/strong&gt; — batch queue (job-type เดิม "POSTINTRETURNDEP" ถูก comment ปิดไว้) ไม่มี SQL ตรงในไฟล์นี้เลย ตรรกะฝากไว้ที่ batch job ทั้งหมด</li></ul></div>
+  <div class="subsec"><span class="tag rules">Business rules / validation</span><ul><li>ไม่มี validation ตรวจว่ารัน moneyreturn ก่อนหรือยัง — ฝากไว้ที่ business rule ฝั่ง PBProcess/DB</li></ul></div>
+  <div class="notable"><strong>Notable:</strong> ไม่พบ hardcode coop_id</div>
+</div>
+
+<div class="page-card">
+  <h4><code>ws_lon_proc_prinarrear_aero_ctrl</code></h4>
+  <p class="filename">ws_lon_proc_prinarrear_aero.aspx.cs (260 บรรทัด)</p>
+  <p class="purpose">ประมวลผลย้อนรายการเงินต้นค้างชำระ พร้อมคำนวณเบี้ยปรับ บันทึกเข้าโมดูล "เก็บเงินอื่นๆ" (kprcvkeepother)</p>
+  <div class="subsec"><span class="tag">Event handlers / key methods</span><ul><li>WebSheetLoadBegin — เรียก IsClearPrinArrearIspayment() ทุกครั้งที่โหลดหน้า (ไม่ใช่แค่ user action)</li><li>PostSearchPrinArrear/PostCalIntFine — ค้นหา+คำนวณเบี้ยปรับ</li><li>SaveWebSheet — update lncontmaster.principal_arrear/keepprn_pmp, ลบ-insert ค่าปรับใน kprcvkeepother</li></ul></div>
+  <div class="subsec"><span class="tag calls">Service / data calls</span><ul><li>&lt;strong&gt;ไม่มีทั้ง batch queue และ WCF เลย&lt;/strong&gt; — synchronous direct SQL ล้วนผ่าน ExecuteDataSource/WebUtil.QuerySdt คำนวณเบี้ยปรับด้วย C# in-memory (ต่างจากหน้า interestestim ที่เรียก wcf.NLoan.of_computeinterest3)</li></ul></div>
+  <div class="subsec"><span class="tag rules">Business rules / validation</span><ul><li>&lt;strong&gt;hardcode finerate = 3.25%&lt;/strong&gt; ซ้ำในสองจุด (PostSearchPrinArrear, PostCalIntFine)</li><li>สูตร: principal_arrear × (finerate/100) × dayscal / dayofyear ปัดทศนิยม 3 ตำแหน่งแบบ AwayFromZero</li><li>keepothitemtype_code = "F"+loangroup_code</li><li>IsClearPrinArrearIspayment ตรวจ 3 กรณี (ปิดหมด/เทียบยอด/สะสมค้าง) — exception ถูก swallow เงียบไม่มี log</li></ul></div>
+  <div class="notable"><strong>Notable:</strong> แม้ชื่อไฟล์มี "_aero" แต่ <strong>ไม่พบ hardcode coop_id แยกในเนื้อโค้ด</strong> — "_aero" หมายถึงทั้งหน้าจอเป็น variant เฉพาะสาย AERO (แยกทั้งไฟล์ ไม่ใช่ if-branch ภายใน)</div>
+</div>
+
+</section>
+
+<section id="closeaudit">
+<h2>F. ปิดงวด / ตรวจสอบ / พิมพ์ (Period-close, Audit &amp; Print)</h2>
+<p class="cat-desc">หมวดปลายทางของวงจรเงินกู้ — ปิดบัญชีรายเดือน ตรวจสอบแก้ไขสัญญา ตั้งสถานะ NPL และพิมพ์เอกสาร ข้อค้นพบสำคัญ: ไม่ใช่ทุกหน้าที่ชื่อขึ้นต้นด้วย "proc_"/"cls_" จะใช้ batch queue เหมือนกัน</p>
+
+<div class="page-card">
+  <h4><code>ws_lon_clsmth_ctrl</code></h4>
+  <p class="filename">ws_lon_clsmth.aspx.cs (110 บรรทัด)</p>
+  <p class="purpose">สั่งปิดงวดบัญชีรายเดือนของระบบเงินกู้ พร้อมคำนวณดอกเบี้ยค้างชำระของสัญญาที่ค้างส่ง เป็นหน้า trigger งาน batch ล้วนๆ</p>
+  <div class="subsec"><span class="tag">Event handlers / key methods</span><ul><li>Cls_Mth_Close() — ALTER TABLE lncontmaster ADD int_payment (schema patch inline แบบ try/catch เงียบ) แล้วส่ง batch</li><li>GetRealObjectApp — query amsecwins หา win_parameter ของหน้าจอปัจจุบัน</li></ul></div>
+  <div class="subsec"><span class="tag calls">Service / data calls</span><ul><li>&lt;strong&gt;WebUtil.runProcessingExtend(state, "LNCLOSEMONTH", ...)&lt;/strong&gt; และ &lt;strong&gt;WebUtil.runProcessingExtend(state, "LNCALINTARRNEW", ..., "loan")&lt;/strong&gt; — batch queue ทั้งคู่</li></ul></div>
+  <div class="subsec"><span class="tag rules">Business rules / validation</span><ul><li>ไม่มี validation input (ไม่เช็คปี/เดือนซ้ำ) — ปล่อยให้ batch process ตรวจสอบเอง</li></ul></div>
+  <div class="notable"><strong>Notable:</strong> ไม่พบ hardcode coop_id</div>
+</div>
+
+<div class="page-card">
+  <h4><code>ws_lon_auditloan_ctrl</code></h4>
+  <p class="filename">ws_lon_auditloan.aspx.cs (330 บรรทัด)</p>
+  <p class="purpose"><strong>ไม่ใช่แค่รายงานอ่านอย่างเดียวตามชื่อ</strong> — เป็นเครื่องมือตรวจสอบแล้ว<strong>แก้ไขค่าฟิลด์ core ของสัญญาโดยตรง</strong> (update lncontmaster) รวมถึงรายการแบ่งชำระ</p>
+  <div class="subsec"><span class="tag">Event handlers / key methods</span><ul><li>PostMemberNo/PostLoanContractNo — โหลดรายละเอียดสัญญา/รายการเคลื่อนไหว/หลักประกัน/การแบ่งชำระ</li><li>PostInsertRowPaydet/PostDeleteRowPaydet — จัดการแถวแบ่งชำระรายงวด</li><li>SetSumPayment — ตรวจยอดรวมก่อนบันทึก</li><li>SaveWebSheet — update lncontmaster ~27 คอลัมน์ + ลบ-insert lncontperiodpaydet ทั้งหมด</li></ul></div>
+  <div class="subsec"><span class="tag calls">Service / data calls</span><ul><li>Synchronous direct SQL ผ่าน ExecuteDataSource + Sta transaction (commit/close ชัดเจน) — ไม่ใช่ WCF ไม่ใช่ batch</li></ul></div>
+  <div class="subsec"><span class="tag rules">Business rules / validation</span><ul><li>ตรวจยอดรวมการแบ่งชำระต้องเท่ากับ period_payment มิฉะนั้น alert และ block การบันทึก (มีเคส "น้อยกว่า" ที่ validation ถูก comment ปิดไว้ — validation ไม่ครบ)</li></ul></div>
+  <div class="notable"><strong>Notable:</strong> <strong>coop "017001"</strong> เท่านั้นที่บันทึก audit log ลง lnauditloanlog ทุกครั้งที่แก้ไขสัญญา — audit trail พิเศษเฉพาะสหกรณ์นี้</div>
+</div>
+
+<div class="page-card">
+  <h4><code>ws_lon_cls_process_setmb_npl_ctrl</code></h4>
+  <p class="filename">ws_lon_cls_process_setmb_npl.aspx.cs (188 บรรทัด)</p>
+  <p class="purpose">สั่งประมวลผล "ตั้งยอดค้างชำระรายเดือนของสมาชิก" (arrear/NPL) ประจำงวด</p>
+  <div class="subsec"><span class="tag">Event handlers / key methods</span><ul><li>PostBegin — ตั้งค่า default ปี/เดือน (locale th-TH)</li><li>JsPostRecvMonth→OfFindConfigProcDate — หาวันที่ประมวลผลจาก amworkcalendar</li><li>JsPostProcessNPL — schema patch แล้วส่ง batch</li><li>OfCheckUseProcess — helper กันรันซ้ำที่เตรียมไว้แต่&lt;strong&gt;ยังไม่ถูก wire เข้ากับ event handler จริง&lt;/strong&gt;</li></ul></div>
+  <div class="subsec"><span class="tag calls">Service / data calls</span><ul><li>&lt;strong&gt;WebUtil.runProcessing(state, "PROCSETARRMTHNPL", ...)&lt;/strong&gt; — batch queue</li><li>wcf.NCommon.of_lastdayofmonth — fallback หาวันสุดท้ายเดือน</li></ul></div>
+  <div class="subsec"><span class="tag rules">Business rules / validation</span><ul><li>ไม่มี validation กันรันซ้ำจริง (helper OfCheckUseProcess มีแต่ไม่ถูกเรียกใช้ — incomplete wiring)</li></ul></div>
+  <div class="notable"><strong>Notable:</strong> ไม่พบ hardcode coop_id</div>
+</div>
+
+<div class="page-card">
+  <h4><code>ws_lon_paintloan_ctrl</code></h4>
+  <p class="filename">ws_lon_paintloan.aspx.cs (384 บรรทัด)</p>
+  <p class="purpose">ยืนยันแล้วว่า "paint" = "print" จริง (ไม่ใช่พิมพ์ผิด) — สั่งพิมพ์เอกสารสัญญาเงินกู้/หนังสือค้ำประกันหลายประเภท เป็น <strong>pure print/report page ไม่มีการเขียนข้อมูลเลย</strong></p>
+  <div class="subsec"><span class="tag">Event handlers / key methods</span><ul><li>PostRetrieve — ค้นหาสัญญาตาม filter</li><li>PrintCont — router ภายในตาม printtype_code (1=หนังสือเงินกู้,2=หนังสือค้ำ,3=ใบแนบคำขอ,4=ใบเครดิตสกอริ่ง)</li><li>PrintCont_Click, PrintColl_Click, PrintLoanoperator_Click ฯลฯ — ดึงชื่อ report จาก lnloantype ตามประเภทเงินกู้</li></ul></div>
+  <div class="subsec"><span class="tag calls">Service / data calls</span><ul><li>iReportBuider/iReportArgument เท่านั้น — query เป็น SELECT ล้วน ไม่มี INSERT/UPDATE ในไฟล์นี้เลย</li><li>lnClass.GetReportReQuestName — ดึงชื่อ report ผ่าน LoanMasterClass</li></ul></div>
+  <div class="subsec"><span class="tag rules">Business rules / validation</span><ul><li>ต้องเลือกประเภทเงินกู้ก่อนพิมพ์ ไม่งั้น error</li><li>แยก logic ตาม printtype_code 1-4 กำหนดรายงานคนละชุด</li></ul></div>
+  <div class="notable"><strong>Notable:</strong> ไม่พบ hardcode coop_id</div>
+</div>
+
+<div class="page-card">
+  <h4><code>ws_lon_keep_adjust_ctrl</code></h4>
+  <p class="filename">ws_lon_keep_adjust.aspx.cs (143 บรรทัด)</p>
+  <p class="purpose">ปรับปรุง/คำนวณใหม่รายการเรียกเก็บ (keeping) ของงวดที่ยังไม่ปิด เมื่อสัญญาเงินกู้เปลี่ยนแปลงระหว่างงวด (regenerate) — เชื่อมโยงกับโมดูล Keeping ที่วิเคราะห์ไว้ก่อนหน้านี้</p>
+  <div class="subsec"><span class="tag">Event handlers / key methods</span><ul><li>WebSheetLoadBegin — หา recv_period ล่าสุดจาก kptempreceive มา pre-fill</li><li>PostReGenKeeping — หัวใจของหน้านี้: วนทุกแถว คำนวณดอกเบี้ย/เงินต้น/ยอดคงเหลือใหม่ เก็บ buffer ใน field ...NEW รอ SaveWebSheet เขียนจริง</li><li>SaveWebSheet — UPDATE kptempreceivedet (ตั้ง case_post='REGEN') + UPDATE lncontmaster (reset interest_return=0)</li></ul></div>
+  <div class="subsec"><span class="tag calls">Service / data calls</span><ul><li>wcf.NLoan.of_computeinterest — synchronous คำนวณดอกเบี้ยงวดใหม่ แล้ว direct SQL update — &lt;strong&gt;ไม่มี transaction wrapper (Sta) ต่างจาก ws_lon_auditloan&lt;/strong&gt; ที่ห่อด้วย Sta ta ชัดเจน</li></ul></div>
+  <div class="subsec"><span class="tag rules">Business rules / validation</span><ul><li>ดอกเบี้ยกินเงินก่อนเงินต้นเสมอ (ถ้ายอดชำระเดิมน้อยกว่าดอกเบี้ยใหม่ ดอกเบี้ยกินหมด ไม่มีส่วนตัดต้น)</li><li>clamp เงินต้น/ยอดคงเหลือไม่ให้ติดลบ</li><li>ไม่มี validation ก่อน save (ไม่เช็คว่ากด regen ก่อนหรือยัง)</li></ul></div>
+  <div class="notable"><strong>Notable:</strong> field case_post='REGEN' เป็น marker สำคัญสำหรับ traceability ของระบบ Keeping ว่าแถวไหนถูก regenerate จากหน้านี้ — ไม่มี hardcode coop_id ภายในไฟล์ (ความเป็น AERO-specific คือทั้งหน้าจอ ไม่ใช่ if-branch)</div>
+</div>
+
+</section>
+
+
+</main>
+</div>
+
+<footer>
+  จัดทำจากการอ่านซอร์สโค้ดจริง (.aspx.cs) ของหน้าจอ .NET WebForms ในโฟลเดอร์ AERO/GCOOP/Saving/Applications/loan/ ทั้งหมด 27 ไฟล์ — อ้างอิงบริบทจากรายงานวิเคราะห์ PBService125 (n_cst_loansrv_lnoperate ฯลฯ) ที่จัดทำไว้ก่อนหน้านี้ในบทสนทนาเดียวกัน
+</footer>
+
+</body>
+</html>
