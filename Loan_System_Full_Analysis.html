@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PRD: ระบบเงินกู้ (Loan System) — วิเคราะห์ครบวงจร 3 ชั้น</title>
+<style>
+  :root {
+    --ink:#1e293b; --muted:#64748b; --border:#e2e8f0; --bg-alt:#f8fafc;
+    --hdr:#1e3a5f; --accent:#eef2ff; --code-bg:#0f172a; --code-fg:#e2e8f0;
+  }
+  * { box-sizing: border-box; }
+  body { font-family: "Tahoma","Segoe UI","Noto Sans Thai",sans-serif; margin:0; background:#f1f5f9; color:var(--ink); line-height:1.75; }
+  .wrap { max-width: 1000px; margin: 0 auto; background:#fff; padding: 40px 48px; }
+  h1 { font-size: 24px; color: var(--hdr); border-bottom: 3px solid var(--hdr); padding-bottom: 14px; }
+  h2 { font-size: 20px; color: var(--hdr); margin-top: 44px; border-left: 5px solid var(--hdr); padding-left: 12px; }
+  h3 { font-size: 16.5px; color: var(--hdr); margin-top: 30px; }
+  h4 { font-size: 14.5px; color:#334155; margin-top:22px; }
+  p { font-size: 14px; }
+  table { border-collapse: collapse; width: 100%; margin: 16px 0; font-size: 13px; }
+  th, td { border: 1px solid var(--border); padding: 8px 10px; text-align: left; vertical-align: top; }
+  th { background: var(--hdr); color: #fff; }
+  tr:nth-child(even) { background: var(--bg-alt); }
+  code { background: #eef2f7; padding: 1px 6px; border-radius: 4px; font-family: Consolas, monospace; font-size: 13px; color:#b91c1c; }
+  pre { background: var(--code-bg); color: var(--code-fg); padding: 16px 20px; border-radius: 8px; overflow-x: auto; font-size: 12.5px; line-height:1.6; }
+  pre code { background: none; color: inherit; padding: 0; }
+  blockquote { border-left: 4px solid var(--accent); margin-left:0; padding-left: 16px; color: var(--muted); }
+  hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>PRD: ระบบเงินกู้ (Loan System) — วิเคราะห์ครบวงจร 3 ชั้น (ASP.NET / PBProcess / PBService125)</h1>
+<p><strong>เอกสารนี้ครอบคลุม:</strong> ชั้น UI/Validation (ASP.NET WebForms C#, แยก CORE และ AERO-extend), ชั้นประมวลผล batch แบบ asynchronous (PBProcess <code>pcloan.pbl</code>), และชั้น service ที่เรียกแบบ synchronous ผ่าน WCF (PBService125 <code>loansrv.pbl</code> และ <code>lncoopsrv.pbl</code>)</p>
+<p><strong>หลักการอ่านหลักฐาน (Evidence legend):</strong></p>
+<ul>
+<li>✅ <strong>ยืนยันจาก source จริง</strong> — อ่านโค้ดจริงจากไฟล์ <code>.aspx.cs</code> (uncompiled, อ่านได้เต็ม) หรือ string-extraction จากไฟล์ <code>.pbl</code> (compiled binary, ใช้ <code>strings -e l</code> แกะ UTF-16LE)</li>
+<li>🟡 <strong>อนุมานจากชื่อ/บริบท</strong> — สำหรับหน้าจอ/ฟังก์ชันที่มีจำนวนมาก ไม่ได้อ่าน source ทีละบรรทัดทั้งหมด แต่อนุมานหน้าที่จาก naming convention และ pattern ที่พบซ้ำในกลุ่มเดียวกัน</li>
+</ul>
+<hr />
+<h2>1. ภาพรวม (Overview)</h2>
+<p>ระบบเงินกู้ของ GCOOP ประกอบด้วย 3 ชั้นการทำงานที่แยกจากกันทางกายภาพแต่เชื่อมกันด้วย 2 กลไกหลัก คือ <strong>การเรียก WCF แบบ synchronous</strong> (สำหรับธุรกรรมที่ต้องรอผลทันที) และ <strong>คิวงาน batch แบบ asynchronous ผ่านตาราง <code>cmprocessing</code></strong> (สำหรับงานประมวลผลชุดใหญ่/ปิดงวด):</p>
+<table>
+<thead>
+<tr>
+<th>ชั้น</th>
+<th>เทคโนโลยี</th>
+<th>หน้าที่</th>
+<th>ไฟล์หลักที่พบ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>1. UI / Validation</td>
+<td>ASP.NET WebForms (C#)</td>
+<td>รับ input, validate เบื้องต้น, แสดงผล, เรียกชั้นถัดไป</td>
+<td><code>GCOOP/Saving/Applications/loan/*.aspx.cs</code> (CORE 142 หน้า, AERO 29 หน้า)</td>
+</tr>
+<tr>
+<td>2. Batch Processing</td>
+<td>PowerBuilder 12.5 (PBProcess.exe)</td>
+<td>งานที่ประมวลผลเป็นชุด/ใช้เวลานาน เช่น ปิดเดือน ตั้งยอดค้าง คำนวณดอกเบี้ยคืน</td>
+<td><code>GCOOP/PBProcess/pcloan.pbl</code></td>
+</tr>
+<tr>
+<td>3. Service Layer</td>
+<td>PowerBuilder 12.5 (WCF-hosted)</td>
+<td>ธุรกรรมที่ต้องผลตอบกลับทันที เช่น บันทึกใบเสร็จ อนุมัติคำขอ คำนวณดอกเบี้ยรายตัว</td>
+<td><code>GCOOP/PBService125/loansrv.pbl</code>, <code>lncoopsrv.pbl</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>สถาปัตยกรรม CORE vs AERO:</strong> โปรเจกต์นี้มี source 2 ชุดคู่ขนาน — <strong>CORE</strong> (baseline เต็มรูปแบบ) และ <strong>AERO</strong> (fork ที่ปรับแต่งเฉพาะลูกค้า) จากการตรวจโค้ดจริงใน <code>CoreSavingLibrary/MenuBar.cs</code> (บรรทัด 135, 173, 211) พบว่าระบบตัดสินใจว่าจะพาผู้ใช้ไปหน้าเวอร์ชันไหน โดยอ่านค่าคอลัมน์ <strong><code>amsecwins.core_flag</code></strong> ต่อหน้าจอ (ต่อ <code>win_parameter</code>):</p>
+<pre><code class="language-csharp">// CoreSavingLibrary/MenuBar.cs (บรรทัด 211, ย่อ)
+(case b.open_type when 3 then savUrl3 else ( case b.core_flag when 1 then savUrl0 else savUrl1 end ) end)
+|| '/GCOOP/Saving/Applications/' || ...
+</code></pre>
+<p>กล่าวคือ <strong><code>core_flag = 1</code> → ใช้เส้นทาง CORE (<code>savUrl0</code>) / ค่าอื่น (เช่น 0) → ใช้เส้นทาง AERO/extend (<code>savUrl1</code>)</strong> ตรงตามกติกาที่ผู้ใช้ระบุ</p>
+<p><strong>⚠️ ข้อจำกัดของการวิเคราะห์นี้:</strong> ค่าจริงของ <code>amsecwins.core_flag</code> เป็น <strong>ข้อมูล runtime ที่เก็บในฐานข้อมูลของแต่ละสหกรณ์</strong> (ตั้งค่าได้ต่อสหกรณ์ ต่อหน้าจอ) ไม่ได้อยู่ใน source code หรือไฟล์ export ที่มีอยู่ในเครื่องนี้ (ไฟล์ <code>Save-Rows-As</code> ของ <code>amsecwins</code> ที่พบมีเฉพาะโมดูล admin/sms เท่านั้น ไม่มี entry ของ loan) จึงไม่สามารถยืนยันค่า core_flag จริงของแต่ละหน้าได้ 100% ในเอกสารนี้จึงใช้หลักฐานทางอ้อมที่ตรวจสอบได้จริงแทน คือ <strong>การ diff เนื้อหาไฟล์ CORE กับ AERO ทีละหน้า</strong></p>
+<table>
+<thead>
+<tr>
+<th>กลุ่ม</th>
+<th>จำนวนหน้า</th>
+<th>การตีความ</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>หน้าที่มีเฉพาะใน CORE</td>
+<td>118</td>
+<td>ไม่มี override ใน AERO →ทำงานจาก CORE เพียงทางเดียว (ไม่ต้องพึ่ง core_flag)</td>
+</tr>
+<tr>
+<td>หน้าที่มีทั้งใน CORE และ AERO และ <strong>เนื้อโค้ดต่างกันจริง</strong></td>
+<td>21</td>
+<td>มีการ fork/ปรับแต่งจริง — ระบบต้องใช้ <code>core_flag</code> ตัดสินว่าจะรันตัวไหน (เอกสารนี้สันนิษฐานว่า deployment สาย AERO ตั้ง <code>core_flag ≠ 1</code> ให้กลุ่มนี้ใช้เวอร์ชัน AERO ที่ปรับแต่งแล้ว)</td>
+</tr>
+<tr>
+<td>หน้าที่มีทั้งใน CORE และ AERO แต่ <strong>เนื้อโค้ดเหมือนกันทุกบรรทัด</strong></td>
+<td>1 (<code>ws_lon_cls_process_setmb_npl_ctrl</code>)</td>
+<td>ไฟล์ AERO เป็นสำเนา CORE เป๊ะ (diff = 0 บรรทัด) ไม่ว่า core_flag จะเป็นค่าใดผลลัพธ์เหมือนกัน</td>
+</tr>
+<tr>
+<td>หน้าที่มีเฉพาะใน AERO (ฟีเจอร์ใหม่ที่ CORE ไม่มี)</td>
+<td>7</td>
+<td>ไม่มี CORE ให้ fallback → ต้องรันจาก AERO เท่านั้น</td>
+</tr>
+<tr>
+<td><strong>รวมหน้าจอทั้งหมดในโมดูล loan</strong></td>
+<td><strong>146 หน้า (ไม่ซ้ำ)</strong></td>
+<td>118 + 21 + 1 + 7 - บวกโฟลเดอร์ระบบ <code>dlg</code> (dialog ย่อย ใช้ร่วม)</td>
+</tr>
+</tbody>
+</table>
+<h2>2. ลำดับการทำงาน (Workflow)</h2>
+<h3>2.1 ชั้น ASP.NET (C#) — รายละเอียดการทำงานของแต่ละ Object</h3>
+<h4>2.1.1 กลุ่มหน้าที่ผ่านการเจาะลึกครบ (29 หน้า ใช้งานจริงฝั่ง AERO deployment)</h4>
+<p>หน้าจอกลุ่มนี้ถูกวิเคราะห์ระดับ source code ครบทุกบรรทัดไปแล้วในรายงานก่อนหน้า (<code>Loan_Pages_Deepdive.html</code>) แบ่งเป็น 6 หมวด:</p>
+<table>
+<thead>
+<tr>
+<th>หมวด</th>
+<th>จำนวนหน้า</th>
+<th>ตัวอย่าง object เด่น</th>
+<th>รูปแบบเรียก backend หลัก</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>A. ตั้งค่า/ข้อมูลหลัก</td>
+<td>3</td>
+<td><code>ws_lon_cfloantype_ctrl</code></td>
+<td>Direct SQL ล้วน</td>
+</tr>
+<tr>
+<td>B. คำขอกู้/อนุมัติ</td>
+<td>7</td>
+<td><code>ws_lon_reqloan_ctrl</code> (3,909 บรรทัด — ใหญ่สุด)</td>
+<td>WCF sync (<code>of_getcollpermiss</code>, <code>of_computeinterest</code>) + <code>LoanMasterClass</code></td>
+</tr>
+<tr>
+<td>C. เบิกจ่าย/รับชำระ</td>
+<td>6</td>
+<td><code>ws_lon_payment_ctrl</code> (2,561 บรรทัด)</td>
+<td>ผสม: WCF sync (<code>of_saveslip_payin</code>) + batch (<code>runProcessingFin</code>)</td>
+</tr>
+<tr>
+<td>D. หลักประกัน</td>
+<td>3</td>
+<td><code>ws_lon_collateral_master_ctrl</code></td>
+<td>Direct SQL + WCF (ขอเลขเอกสาร)</td>
+</tr>
+<tr>
+<td>E. ดอกเบี้ย/เงินคืน</td>
+<td>5</td>
+<td><code>ws_lon_certificateinterest_ctrl</code></td>
+<td>ผสมพิเศษ: <code>Task.Factory.StartNew()</code> self-host</td>
+</tr>
+<tr>
+<td>F. ปิดงวด/ตรวจสอบ</td>
+<td>5</td>
+<td><code>ws_lon_clsmth_ctrl</code>, <code>ws_lon_auditloan_ctrl</code></td>
+<td>Batch queue (<code>runProcessingExtend</code>)</td>
+</tr>
+</tbody>
+</table>
+<p><em>(รายละเอียดระดับ event handler / business rule / hardcode ต่อหน้า ดูใน <code>Loan_Pages_Deepdive.html</code> ที่ส่งมอบไปแล้ว)</em></p>
+<h4>2.1.2 กลุ่มหน้า CORE-only ที่ไม่มีการ override ใน AERO (118 หน้า) — จัดหมวดตาม naming convention 🟡</h4>
+<p>หน้ากลุ่มนี้ยังไม่ได้อ่าน source ทีละบรรทัด (ปริมาณมาก) แต่จัดกลุ่มตาม prefix ซึ่งเป็น convention ที่สม่ำเสมอตลอดทั้งระบบ (ยืนยันจากกลุ่ม 29 หน้าที่เจาะลึกแล้วว่า prefix สื่อความหมายตรงจริง):</p>
+<p><strong><code>ws_lon_ucf*</code> — ตั้งค่าฐานข้อมูลหลัก (User Config Form)</strong> (21 หน้า)</p>
+<p>master data ของโมดูลเงินกู้ทั้งหมด: ประเภทหลักประกัน (ucfloancolltype), เหตุผลปรับปรุง (ucfadjustcause), ประเภทอาคาร (ucfbuildingtype/area), สถานะสัญญา (ucfloancontact_status), กฎหมายสัญญา (ucfloancontlaw), ค่าปรับ (ucfloanfine), วัตถุประสงค์กู้ (ucfloanobjective), ประเภทค่าธรรมเนียม (ufcloanfees) และอื่นๆ รวม 15 หน้า — เทียบเคียงรูปแบบเดียวกับ <code>ws_lon_cfloantype_ctrl</code>/<code>ws_lon_cfgrpgrtpermiss_ctrl</code> ที่เจาะลึกแล้ว (หมวด A) คือ direct-SQL CRUD ล้วน ไม่มี WCF</p>
+<p><code>ws_lon_ucfadjustcause_ctrl</code>, <code>ws_lon_ucfadjustcause_promise_ctrl</code>, <code>ws_lon_ucfbuildingarea_ctrl</code>, <code>ws_lon_ucfbuildingtype_ctrl</code>, <code>ws_lon_ucfcollmasttype_ctrl</code>, <code>ws_lon_ucfcollredeemcause_ctrl</code>, <code>ws_lon_ucfcontcclcause_ctrl</code>, <code>ws_lon_ucfdoubtacctype_ctrl</code>, <code>ws_lon_ucfloancolltype_ctrl</code>, <code>ws_lon_ucfloancontact_status_ctrl</code>, <code>ws_lon_ucfloancontlaw_ctrl</code>, <code>ws_lon_ucfloanfine_ctrl</code>, <code>ws_lon_ucfloanitemtype_ctrl</code>, <code>ws_lon_ucfloanobjective_ctrl</code>, <code>ws_lon_ucfloantypeivrmob_ctrl</code>, <code>ws_lon_ucfroundmoney_ctrl</code>, <code>ws_lon_ucfslipitemtype_ctrl</code>, <code>ws_lon_ucfsliptype_ctrl</code>, <code>ws_mem_ucfmembstatus_ctrl</code>, <code>wc_lon_ucfpaymentfrom_ctrl</code>, <code>wc_lon_ucfpaymenttype_ctrl</code></p>
+<p><strong><code>ws_lon_cf*</code> — ตั้งค่าเงื่อนไขเชิงธุรกิจ (Configuration)</strong> (6 หน้า)</p>
+<p>กำหนดเงื่อนไขที่ซับซ้อนกว่า master data ธรรมดา: อัตราดอกเบี้ยโปรโมชั่น (cfintpromotion), อัตราดอกเบี้ยแบบขั้นบันได (cfintrate/cfintrate_by_range), ค่าคงที่เงินกู้ (cfloanconstant), เงินเดือนคงเหลือขั้นต่ำ (cfsalarybalance), สิทธิ์กลุ่มเงินกู้ (cfgrplnpermiss — คู่ขนานกับ cfgrpgrtpermiss ที่เจาะลึกแล้ว)</p>
+<p><code>ws_lon_cfgrplnpermiss_ctrl</code>, <code>ws_lon_cfintpromotion_ctrl</code>, <code>ws_lon_cfintrate_by_range_ctrl</code>, <code>ws_lon_cfintrate_ctrl</code>, <code>ws_lon_cfloanconstant_ctrl</code>, <code>ws_lon_cfsalarybalance_ctrl</code></p>
+<p><strong><code>ws_lon_apv*</code> — อนุมัติ (Approval)</strong> (13 หน้า)</p>
+<p>คู่ขนานกับ <code>ws_lon_apvloan_ctrl</code>/<code>ws_lon_apvreqcompound_ctrl</code> ที่เจาะลึกแล้ว (หมวด B) — เป็นหน้าอนุมัติ 2-ขั้นตอนสำหรับธุรกรรมประเภทอื่นที่ไม่ใช่คำขอกู้ใหม่: อนุมัติเงินกู้ ATM (approve_atmloan), อนุมัติปรับงวด (apvadjust_period), อนุมัติปรับดอกเบี้ย/เงินต้น (apvinterest, apvinterestadjustment, apvinteresttoprincipal, apvprincipaladjustment, apvprnintadjustment), อนุมัติผ่อนผันหนี้สงสัยจะสูญ (apvoff_debt), อนุมัติสัญญาสัญญา (apvperiod_loan), อนุมัติคำสัญญา (apvpromise — จ่ายตามที่สัญญาไว้), อนุมัติการปรับปรุงทั่วไป (apvapproveadjustment)</p>
+<p><code>ws_lon_approve_atmloan_ctrl</code>, <code>ws_lon_approve_loan_ctrl</code>, <code>ws_lon_approveadjustment_ctrl</code>, <code>ws_lon_apvadjust_period_ctrl</code>, <code>ws_lon_apvapproveadjustment_ctrl</code>, <code>ws_lon_apvinterest_ctrl</code>, <code>ws_lon_apvinterestadjustment_ctrl</code>, <code>ws_lon_apvinteresttoprincipal_ctrl</code>, <code>ws_lon_apvoff_debt_ctrl</code>, <code>ws_lon_apvperiod_loan_ctrl</code>, <code>ws_lon_apvprincipaladjustment_ctrl</code>, <code>ws_lon_apvprnintadjustment_ctrl</code>, <code>ws_lon_apvpromise_ctrl</code></p>
+<p><strong><code>ws_lon_ccl*</code> — สัญญาที่ถูกยกเลิก/ปิดพิเศษ (Cancel)</strong> (8 หน้า)</p>
+<p>CCL = Cancel: จัดการสัญญาที่ถูกยกเลิกทั้งกระบวนการ ตั้งแต่ตัวสัญญาเอง (cclcontract), หลักประกัน (cclcoll), การอนุมัติ (cclapvloan), จำนวนเงิน (cclfinamount), การรับชำระคืน (cclloanrcv/cclpayin), การขึ้นทะเบียนสัญญาใหม่แทน (cclregcontract), และรายการโอนหลักประกัน (ccltrnsloancoll) — โมดูลย่อยสำหรับ correction แบบเต็มรูปแบบเมื่อสัญญาต้องถูกยกเลิก ไม่ใช่แค่แก้ field เดียวแบบ <code>ws_lon_auditloan_ctrl</code></p>
+<p><code>ws_lon_cclapvloan_ctrl</code>, <code>ws_lon_cclcoll_ctrl</code>, <code>ws_lon_cclcontract_ctrl</code>, <code>ws_lon_cclfinamount_ctrl</code>, <code>ws_lon_cclloanrcv_ctrl</code>, <code>ws_lon_cclpayin_ctrl</code>, <code>ws_lon_cclregcontract_ctrl</code>, <code>ws_lon_ccltrnsloancoll_ctrl</code></p>
+<p><strong><code>ws_lon_req*</code> — คำขอประเภทอื่นๆ (Request)</strong> (6 หน้า)</p>
+<p>คู่ขนานกับ <code>ws_lon_reqloan_ctrl</code>/<code>ws_lon_reqcompound_ctrl</code>/<code>ws_lon_reqpauseloan_ctrl</code> — คำขอเปลี่ยนกฎหมายสัญญา (reqchgcontlaw), คำขอปรับปรุงสัญญาทั่วไป (reqcontadjust), คำขอกู้ระหว่างสหกรณ์ (reqlncoopother — เชื่อมกับโมดูล <code>lncoopsrv.pbl</code>), คำขอกู้ปกติเวอร์ชันเก่า/ทางเลือก (reqlnnorm, reqloan222 — อาจเป็น legacy หรือ parallel flow ของ reqloan หลัก), คำขอจำลองสถานการณ์ก่อนกู้จริง (reqsimulate)</p>
+<p><code>ws_lon_reqchgcontlaw_ctrl</code>, <code>ws_lon_reqcontadjust_ctrl</code>, <code>ws_lon_reqlncoopother_ctrl</code>, <code>ws_lon_reqlnnorm_ctrl</code>, <code>ws_lon_reqloan222_ctrl</code>, <code>ws_lon_reqsimulate_ctrl</code></p>
+<p><strong><code>ws_lon_prc*</code>/<code>proc*</code>/<code>process*</code> — ทริกเกอร์งาน batch (Processing triggers)</strong> (14 หน้า)</p>
+<p>หน้าจอเหล่านี้คือ "ปุ่มกด" ฝั่ง .NET ที่คู่กับ object ฝั่ง PBProcess โดยตรง (ดูหัวข้อ 2.2) — คาดว่าเรียก <code>WebUtil.runProcessing*</code> ด้วย proc_name ที่ตรงกับ object ใน <code>pcloan.pbl</code> เช่น <code>ws_lon_prclnshortlong_ctrl</code>↔<code>n_cst_proc_lnshortlong</code> (LNSHORTLONG), <code>ws_lon_prcshrlonbal_ctrl</code>/<code>prcshrlonbal_mast_ctrl</code>↔<code>n_cst_proc_slshrlonbal</code> (SHRLONBAL/SHRLONBALMAS), <code>ws_lon_prc_preparepay_ctrl</code>↔<code>n_cst_proc_lnprepare</code> (LNPAYPREPARE), <code>ws_lon_process_doubtacc_ctrl</code>/<code>condition_doubtacc_ctrl</code>↔หนี้สงสัยจะสูญ, <code>ws_lon_process_moneyreturn_ctrl</code>/<code>moneyreturnall_ctrl</code>↔<code>n_cst_proc_slmnyret</code>, <code>ws_lon_clsday_ctrl</code>/<code>clsyear_ctrl</code>/<code>confirmyear_ctrl</code>↔<code>n_cst_proc_slcls</code>/<code>slyear</code>/<code>yrcfbal</code> (LNCLOSEDAY/LNCLOSEYEAR/CONFIRMBAL)</p>
+<p><code>ws_lon_clsday_ctrl</code>, <code>ws_lon_clsyear_ctrl</code>, <code>ws_lon_confirmyear_ctrl</code>, <code>ws_lon_condition_doubtacc_ctrl</code>, <code>ws_lon_process_doubtacc_ctrl</code>, <code>ws_lon_prc_preparepay_ctrl</code>, <code>ws_lon_prclnshortlong_ctrl</code>, <code>ws_lon_prcshrlonbal_ctrl</code>, <code>ws_lon_prcshrlonbal_mast_ctrl</code>, <code>ws_lon_process_moneyreturn_ctrl</code>, <code>ws_lon_process_moneyreturnall_ctrl</code>, <code>ws_lon_processing_another_ctrl</code>, <code>ws_sl_upmblontype_process_ctrl</code>, <code>ws_lon_npl_process_class_ctrl</code></p>
+<p><strong><code>ws_lon_reprnt*</code> — พิมพ์ซ้ำเอกสาร (Reprint)</strong> (4 หน้า)</p>
+<p>คู่ขนานกับ <code>ws_lon_reprnmortgage_ctrl</code>/<code>ws_lon_paintloan_ctrl</code> (หมวด F) — พิมพ์ซ้ำสัญญา (reprntcont), ใบรับเงิน (reprntpayin), ใบจ่ายเงิน (reprntpayout), ใบเสร็จรับ (reprntreceive) เป็นหน้า report-only ไม่มีการเขียนข้อมูล (pattern เดียวกับ <code>ws_lon_paintloan_ctrl</code> ที่ยืนยันแล้วว่าเป็น pure print page)</p>
+<p><code>ws_lon_reprntcont_ctrl</code>, <code>ws_lon_reprntpayin_ctrl</code>, <code>ws_lon_reprntpayout_ctrl</code>, <code>ws_lon_reprntreceive_ctrl</code></p>
+<p><strong><code>ws_lon_adjust*</code>/<code>adj*</code> — ปรับปรุงยอด (Adjustment)</strong> (10 หน้า)</p>
+<p>แก้ไขยอดเฉพาะจุดโดยไม่ต้องยกเลิกสัญญาทั้งสัญญา (ต่างจากกลุ่ม ccl): ปรับดอกเบี้ย (Interestadjustment, adjloanetc), ปรับเงินคืน (adjust_moneyreturn), ปรับงวด (adjust_period, adjustcontperiodpay), ปรับยอดถอนเงินกู้ (adjustmentloanwtd), ปรับคำสัญญา (adjustpromise), ปรับเงินต้น (principaladjustment)</p>
+<p><code>ws_lon_Interestadjustment_ctrl</code>, <code>ws_lon_adjloanetc_ctrl</code>, <code>ws_lon_adjust_moneyreturn_ctrl</code>, <code>ws_lon_adjust_period_ctrl</code>, <code>ws_lon_adjustcontperiodpay_ctrl</code>, <code>ws_lon_adjustmentloanwtd_ctrl</code>, <code>ws_lon_adjustpromise_ctrl</code>, <code>ws_lon_principaladjustment_ctrl</code>, <code>ws_lon_interesttoprincipal_ctrl</code>, <code>ws_lon_intcertadjust_ctrl</code></p>
+<p><strong>หลักประกัน/ทวงถามหนี้/อื่นๆ (Collateral / Collection / Misc)</strong> (34 หน้า)</p>
+<p>หลักประกัน: รายละเอียด/ตรวจสอบหลักประกัน (collateral_detail, collateral_detailchk, collateral_master_ldet), ตรวจสอบ/ไถ่ถอน (collcheck, collredeem), ส่งออกหลักประกัน (sl_loan_collexport); ทวงถาม: คำสัญญาชำระหนี้ (promise_ctrl คู่กับ apvpromise/adjustpromise), หนี้สงสัยจะสูญ (npl_process_class, nplmaster — คู่กับ <code>ws_lon_nplmaster_ctrl</code> ที่พบใน AERO/loanf), ยกเลิกหนี้ (off_debt คู่กับ apvoff_debt); เบ็ดเตล็ด: นำเข้าเช็ค/ตั๋วเงิน (imp_post), รับชำระผ่านบิล (billpayment), ทดสอบ ATM (atmtest), เปลี่ยนเลขสัญญา (changcontractno), สร้างไฟล์ excel ประกัน (create_insurance_excel), รายการเงินกู้แบบละเอียด (detail, detailtranloan, trnsdetail, trnsloancoll, trnsloannpl, list), การชำระค้าง (payment_arrear, payment_details), รายการแก้ไขเงินคืน (edit_moneyreturn, listpay_moneyreturn ×2), ค่าประมาณการชำระ (estpayment), บัญชีโอน (cmucftofromaccid), เงินกู้เพิ่ม (loan_addloan), ใบสั่งจ่ายพิเศษ (loan_sliporder, sliporder_new, approve_sliporder), รายละเอียดเงินกู้ (loan_details)</p>
+<p><code>ws_lon_collateral_detail_ctrl</code>, <code>ws_lon_collateral_detailchk_ctrl</code>, <code>ws_lon_collateral_master_ldet_ctrl</code>, <code>ws_lon_collcheck_ctrl</code>, <code>ws_lon_collredeem_ctrl</code>, <code>ws_sl_loan_collexport_ctrl</code>, <code>ws_lon_promise_ctrl</code>, <code>ws_lon_nplmaster_ctrl</code>, <code>ws_lon_off_debt_ctrl</code>, <code>ws_imp_post_ctrl</code>, <code>ws_lon_billpayment_ctrl</code>, <code>ws_lon_atmtest_ctrl</code>, <code>ws_lon_changcontractno_ctrl</code>, <code>ws_lon_create_insurance_excel_ctrl</code>, <code>ws_lon_detail_ctrl</code>, <code>ws_lon_detailtranloan_ctrl</code>, <code>ws_lon_trnsdetail_ctrl</code>, <code>ws_lon_trnsloancoll_ctrl</code>, <code>ws_lon_trnsloannpl_ctrl</code>, <code>ws_lon_list_ctrl</code>, <code>ws_lon_payment_arrear_ctrl</code>, <code>ws_lon_payment_details_ctrl</code>, <code>ws_lon_edit_moneyreturn_ctrl</code>, <code>ws_lon_listpay_moneyreturn_ctrl</code>, <code>ws_sl_listpay_moneyreturn_ctrl</code>, <code>ws_lon_estpayment_ctrl</code>, <code>ws_lon_cmucftofromaccid_ctrl</code>, <code>ws_loan_addloan_ctrl</code>, <code>ws_loan_sliporder_ctrl</code>, <code>ws_loan_sliporder_new_ctrl</code>, <code>ws_loan_approve_sliporder_ctrl</code>, <code>ws_loan_details_ctrl</code>, <code>ws_lon_contestpayment_ctrl</code>, <code>ws_sl_req_chgcontlaw_ctrl</code></p>
+<h3>2.2 ชั้น PBProcess Batch (<code>pcloan.pbl</code>) — รายละเอียดการทำงานของแต่ละ Object ✅</h3>
+<p>โครงสร้างเดียวกับที่พบใน <code>pckeeping.pbl</code> ของโมดูล Keeping: มี object ตัวกลาง (<code>n_cst_pbprocess_loan</code>) ทำหน้าที่รับ job จากคิว แล้ว <strong>dispatch ตาม <code>proc_name</code></strong> ไปยัง object ผู้ทำงานจริง (worker object) — ยืนยันจากการแกะ <code>strings -e l</code> ไฟล์ <code>pcloan.pbl</code> (AERO, 9,682,432 bytes) พบ object 10 ตัว:</p>
+<table>
+<thead>
+<tr>
+<th>Object</th>
+<th>สืบทอดจาก</th>
+<th>หน้าที่หลัก (ยืนยันจาก source)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>n_cst_pbprocess_loan</code></td>
+<td><code>n_cst_pbprocess</code></td>
+<td><strong>ตัว dispatcher หลัก</strong> — event <code>ue_pbprocess</code> มี <code>choose case upper(astr_process.proc_name)</code> แตกเป็น ~35 case สร้าง worker object ที่เหมาะสมแล้วเรียกฟังก์ชันเริ่มงาน</td>
+</tr>
+<tr>
+<td><code>n_cst_proc_slcls</code></td>
+<td><code>n_cst_process_base</code></td>
+<td>ปิดวัน/ปิดเดือน/สร้างอัตราดอกเบี้ยลอยตัว (28 ฟังก์ชัน <code>of_slcls_*</code>/<code>of_genfindintflat_*</code>)</td>
+</tr>
+<tr>
+<td><code>n_cst_proc_sltrnpayin</code></td>
+<td><code>n_cst_process_base</code></td>
+<td>ประมวลผลรายการนำเข้าชำระ (transaction pay-in) จากภายนอกเข้าสู่ระบบจริง — ตัวรับงาน <code>LNPOSTTRNPAYIN</code></td>
+</tr>
+<tr>
+<td><code>n_cst_proc_slyear</code></td>
+<td><code>n_cst_process_base</code></td>
+<td>ปิดปีบัญชี (10 ฟังก์ชัน <code>of_slcls_year*</code>)</td>
+</tr>
+<tr>
+<td><code>n_cst_proc_slmnyret</code></td>
+<td><code>n_cst_process_base</code></td>
+<td><strong>คำนวณ/โพสต์ดอกเบี้ยคืน (money return)</strong> — object ที่ถูกเรียกมากที่สุดในตาราง dispatch (16 จาก 35 case ชี้มาที่นี่)</td>
+</tr>
+<tr>
+<td><code>n_cst_proc_lnshortlong</code></td>
+<td><code>n_cst_process_base</code></td>
+<td>ปรับงวดผ่อนกรณีเกษียณ/ระยะสั้น-ยาว (<code>of_proc_lnshortlong</code>, <code>of_reqchgperiod_retire</code>)</td>
+</tr>
+<tr>
+<td><code>n_cst_proc_slshrlonbal_ole</code> / <code>n_cst_proc_slshrlonbal</code></td>
+<td><code>n_cst_process_base</code></td>
+<td>คำนวณยอดคงเหลือหุ้น-เงินกู้ประกอบกัน (share-loan balance) มี 2 เวอร์ชัน (ธรรมดา และ OLE)</td>
+</tr>
+<tr>
+<td><code>n_cst_proc_yrcfbal</code></td>
+<td><code>n_cst_process_base</code></td>
+<td>ยกยอดยกไปปีถัดไป (carry-forward balance) 12 ฟังก์ชัน <code>of_prc_cfbal_*</code> ครอบคลุมทั้งเงินฝาก/หุ้น/เงินกู้/หลักประกัน/สมาชิก</td>
+</tr>
+<tr>
+<td><code>n_cst_sl_mth_arrear_process</code></td>
+<td><code>n_cst_process_base</code></td>
+<td><strong>ตั้งยอดค้างชำระ/NPL รายเดือน</strong> — ตัวรับงาน <code>PROCSETARRMTHNPL</code>, มีฟังก์ชันซ้ำกับ <code>n_cst_proc_slmnyret</code>/<code>n_cst_proc_yrcfbal</code> จำนวนมาก (สันนิษฐานว่าเป็น superset/สืบทอด logic บางส่วนมาจากอ็อบเจกต์เหล่านั้น)</td>
+</tr>
+<tr>
+<td><code>n_cst_loansrv_interest</code>, <code>n_cst_loansrv_calperiod</code></td>
+<td><code>nonvisualobject</code></td>
+<td>Service คำนวณดอกเบี้ย/งวดผ่อน — <strong>object เดียวกับที่พบใน PBService125</strong> (<code>loansrv.pbl</code>) ถูก compile ฝังซ้ำไว้ใน <code>pcloan.pbl</code> ด้วยเพื่อให้ batch job เรียกใช้ได้โดยไม่ต้องข้าม process (ดูหัวข้อ 2.3)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>ตาราง dispatch เต็ม (<code>n_cst_pbprocess_loan::ue_pbprocess</code>) — 35 proc_name ✅:</strong></p>
+<table>
+<thead>
+<tr>
+<th>proc_name (JOB CODE)</th>
+<th>Worker Object</th>
+<th>ฟังก์ชันที่เรียก</th>
+<th>หมายเหตุ coop-specific</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>LNCLOSEDAY</code></td>
+<td><code>n_cst_proc_slcls</code></td>
+<td><code>of_slcls_day()</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>LNCLOSEMONTH</code></td>
+<td><code>n_cst_proc_slcls</code></td>
+<td><code>of_slcls_mth()</code></td>
+<td>เรียกจาก <code>ws_lon_clsmth_ctrl</code></td>
+</tr>
+<tr>
+<td><code>LNCLOSEYEAR</code></td>
+<td><code>n_cst_proc_slyear</code></td>
+<td><code>of_slcls_year()</code></td>
+<td>เรียกจาก <code>ws_lon_clsyear_ctrl</code></td>
+</tr>
+<tr>
+<td><code>LNSHORTLONG</code></td>
+<td><code>n_cst_proc_lnshortlong</code></td>
+<td><code>of_proc_lnshortlong()</code></td>
+<td>เรียกจาก <code>ws_lon_prclnshortlong_ctrl</code></td>
+</tr>
+<tr>
+<td><code>CONFIRMBAL</code></td>
+<td><code>n_cst_proc_yrcfbal</code></td>
+<td><code>of_prc_cfbal()</code></td>
+<td>เรียกจาก <code>ws_lon_confirmyear_ctrl</code></td>
+</tr>
+<tr>
+<td><code>LNPAYPREPARE</code></td>
+<td><code>n_cst_proc_lnprepare</code></td>
+<td><code>of_proc_lnprepare()</code></td>
+<td>เรียกจาก <code>ws_lon_prc_preparepay_ctrl</code></td>
+</tr>
+<tr>
+<td><code>LNPOSTTRNPAYIN</code></td>
+<td><code>n_cst_proc_sltrnpayin</code></td>
+<td><code>of_proc_trnpayin()</code></td>
+<td>เรียกจาก <code>ws_lon_prctrnpayin_ctrl</code> (ยืนยันแล้วในรายงานก่อนหน้า)</td>
+</tr>
+<tr>
+<td><code>PROCINTRETURN</code></td>
+<td><code>n_cst_proc_slmnyret</code></td>
+<td><code>of_proc_mnyreturn()</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>PROCSETINTRETURN</code></td>
+<td><code>n_cst_proc_slmnyret</code></td>
+<td><code>branch ตาม coop</code></td>
+<td><strong>057001→of_proc_mnyreturn_doae() / 065001,060001→of_proc_setmnyreturn() / อื่นๆ→of_proc_mnyreturn()</strong></td>
+</tr>
+<tr>
+<td><code>PROCSETINTRETURNNOTPOST</code></td>
+<td><code>n_cst_proc_slmnyret</code></td>
+<td><code>of_proc_setmnyreturn()</code></td>
+<td>เรียกจาก <code>ws_lon_proc_moneyreturn_ctrl</code></td>
+</tr>
+<tr>
+<td><code>PROCSETINTRETURNCHECK</code></td>
+<td><code>n_cst_proc_slmnyret</code></td>
+<td><code>of_calintreturn_check()</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>PROCSETINTCHECKSTM</code></td>
+<td><code>n_cst_proc_slmnyret</code></td>
+<td><code>of_calintstm_check()</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>PROCPOSTINTRETURN</code></td>
+<td><code>n_cst_proc_slmnyret</code></td>
+<td><code>of_proc_postmnyreturn()</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>PROCPOSTINTRETURNATM</code></td>
+<td><code>n_cst_proc_slmnyret</code></td>
+<td><code>of_proc_postmnyreturn()</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>MONEYRETURNPM</code></td>
+<td><code>n_cst_proc_slmnyret</code></td>
+<td><code>of_proc_mnyfrompm()</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>MONEYRETURNPX</code></td>
+<td><code>n_cst_proc_slmnyret</code></td>
+<td><code>of_proc_mnyfrompx()</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>SHRLONBAL</code></td>
+<td><code>n_cst_proc_slshrlonbal</code></td>
+<td><code>of_proc_shrlonbal()</code></td>
+<td>เรียกจาก <code>ws_lon_prcshrlonbal_ctrl</code></td>
+</tr>
+<tr>
+<td><code>SHRLONBALMAS</code></td>
+<td><code>n_cst_proc_slshrlonbal</code></td>
+<td><code>of_proc_shrlonbal_mast()</code></td>
+<td>เรียกจาก <code>ws_lon_prcshrlonbal_mast_ctrl</code></td>
+</tr>
+<tr>
+<td><code>SHRLONBAL_OLE</code></td>
+<td><code>n_cst_proc_slshrlonbal_ole</code></td>
+<td><code>of_proc_shrlonbal()</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>DPTRANDEPT</code></td>
+<td><code>n_cst_proc_deposit</code></td>
+<td><code>of_init()+of_procdeptuptran()+of_pgfinish()</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>PROCSETARRMTHNPL</code></td>
+<td><code>n_cst_sl_mth_arrear_process</code></td>
+<td><code>of_initservice()+of_procnpl()</code></td>
+<td>เรียกจาก <code>ws_lon_cls_process_setmb_npl_ctrl</code> (ยืนยันแล้ว)</td>
+</tr>
+<tr>
+<td><code>POSTINTRETURNDEP</code></td>
+<td><code>n_cst_proc_slmnyret</code></td>
+<td><code>of_post_toslippayout2()</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>POSTINTRETPAYOUT</code></td>
+<td><code>n_cst_proc_slmnyret</code></td>
+<td><code>of_post_toslippayout2()</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>POSTINTRETPAYOUT_POSTSTM</code></td>
+<td><code>n_cst_proc_slmnyret</code></td>
+<td><code>of_post_toslippayout()</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>POSTINTRETPAYOUT_POSTSTM_SUMPAY</code></td>
+<td><code>n_cst_proc_slmnyret</code></td>
+<td><code>of_post_toslippayout_sumpay()</code></td>
+<td>เรียกจาก <code>ws_lon_proc_paymoneyreturn_ctrl</code> (ยืนยันแล้ว)</td>
+</tr>
+<tr>
+<td><code>POSTSETMONEYRETURN</code></td>
+<td><code>n_cst_proc_slmnyret</code></td>
+<td><code>of_proc_setmnyreturn()</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>POSTSETINTCLRCONTNEW</code></td>
+<td><code>n_cst_proc_slmnyret</code></td>
+<td><code>of_setlistcontnewlrt()</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>POSTMONEYRETURNPXLON</code></td>
+<td><code>n_cst_proc_slmnyret</code></td>
+<td><code>of_post_toslippayout_lrt_pxloan()</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>LNADJPERIODPAYRETIRE</code></td>
+<td><code>n_cst_proc_lnshortlong</code></td>
+<td><code>of_reqchgperiod_retire()</code></td>
+<td></td>
+</tr>
+<tr>
+<td><code>POSTINTRETPAYOUTPEA</code></td>
+<td><code>n_cst_proc_slmnyret</code></td>
+<td><code>of_post_toslippayout_pea()</code></td>
+<td>PEA = การไฟฟ้าส่วนภูมิภาค (coop เฉพาะกลุ่ม)</td>
+</tr>
+<tr>
+<td><code>PROCSETLOANRETURN</code></td>
+<td><code>n_cst_proc_slmnyret</code></td>
+<td><code>of_proc_setmnyreturn()</code></td>
+<td><strong>ถ้า coop 078001 → เรียกเพิ่ม of_setlistcontnewlrt()</strong></td>
+</tr>
+<tr>
+<td><code>LNGENFATRATE</code></td>
+<td><code>n_cst_proc_slcls</code></td>
+<td><code>of_genfindintflat_intrate_new()</code></td>
+<td>สร้างอัตราดอกเบี้ยลอยตัวใหม่</td>
+</tr>
+<tr>
+<td><code>LNGENFATRATECONT</code></td>
+<td><code>n_cst_proc_slcls</code></td>
+<td><code>of_genfindintflat_rate_contno()</code></td>
+<td>สร้างอัตราดอกเบี้ยลอยตัวรายสัญญา</td>
+</tr>
+<tr>
+<td><code>LNCLOSEMONTHINTARR</code></td>
+<td><code>n_cst_proc_slcls</code></td>
+<td><code>of_slcls_mth_genintarr()</code></td>
+<td>สร้างดอกเบี้ยค้าง ณ ปิดเดือน (เวอร์ชันมาตรฐาน)</td>
+</tr>
+<tr>
+<td><code>LNCALINTARRNEW</code></td>
+<td><code>n_cst_proc_slcls</code></td>
+<td><code>**of_slcls_mth_genintarr_aero()**</code></td>
+<td><strong>ฟังก์ชันมีคำต่อท้าย <code>_aero</code> ชัดเจน — เวอร์ชันเฉพาะสาย AERO</strong> เรียกจาก <code>ws_lon_clsmth_ctrl</code> คู่กับ LNCLOSEMONTH (ยืนยันแล้ว)</td>
+</tr>
+</tbody>
+</table>
+<p><strong>ข้อสังเกตสำคัญ:</strong> <code>PROCSETINTRETURN</code> และ <code>PROCSETLOANRETURN</code> มีการ hardcode <code>coop_control</code>/<code>coop_id</code> เป็นเงื่อนไข if แยกเส้นทางการคำนวณดอกเบี้ยคืนตามสหกรณ์ (<code>'057001'</code>, <code>'065001'</code>, <code>'060001'</code>, <code>'078001'</code>) — เป็น pattern เดียวกับที่พบซ้ำๆ ทั่วทั้งระบบ (multi-tenant hardcode technical debt)</p>
+<h3>2.3 ชั้น PBService125 (<code>loansrv.pbl</code>, <code>lncoopsrv.pbl</code>) — สรุปจากรายงานก่อนหน้า ✅</h3>
+<p>(รายละเอียดเต็มอยู่ใน <code>Analysis_Loan_System.md</code>/<code>.html</code> ที่ส่งมอบไปแล้ว สรุปย่อเพื่อความครบถ้วนของเอกสารนี้)</p>
+<table>
+<thead>
+<tr>
+<th>Object</th>
+<th>ขนาด</th>
+<th>หน้าที่</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>n_cst_loansrv_lnoperate</code></td>
+<td>262 ฟังก์ชัน</td>
+<td><strong>ตัวประสานงานหลัก (orchestrator)</strong> ของธุรกรรมเงินกู้แบบ synchronous ทั้งหมด: บันทึกใบนำฝาก/รับชำระ (<code>of_saveslip_payin</code>), โพสต์สัญญา (<code>of_poststm_contract</code>), บันทึกใบเบิกเงินกู้ (<code>of_saveslip_lnrcv</code>) ประกอบร่างจาก service ย่อย: <code>inv_intsrv</code>(ดอกเบี้ย), <code>inv_docsrv</code>(เลขเอกสาร), <code>inv_calendarsrv</code>/<code>inv_datetimesrv</code>, <code>inv_dwxmliesrv</code>(XML transport — <strong>ตัวเดียวกับที่ batch layer ใช้</strong>), <code>inv_finsrv</code>(บัญชี), <code>inv_deptsrv</code>(อายัดเงินฝาก), <code>inv_calpeirod</code>(งวด)</td>
+</tr>
+<tr>
+<td><code>n_cst_loansrv_calperiod</code></td>
+<td>-</td>
+<td>คำนวณงวดผ่อน/ตารางผ่อนชำระ</td>
+</tr>
+<tr>
+<td><code>n_cst_loansrv_interest</code></td>
+<td>-</td>
+<td>คำนวณอัตรา/จำนวนดอกเบี้ย (engine เดียวกับที่ฝังซ้ำใน <code>pcloan.pbl</code>)</td>
+</tr>
+<tr>
+<td><code>n_cst_loansrv_atm</code></td>
+<td>-</td>
+<td>ธุรกรรมผ่านช่องทาง ATM/หักบัญชีอัตโนมัติ</td>
+</tr>
+<tr>
+<td><code>n_cst_loansrv_collpermiss</code></td>
+<td>-</td>
+<td>สิทธิ์หลักประกัน 4 ประเภท: 01=ผู้ค้ำ, 02=หุ้น, 03=เงินฝาก, 04=จำนอง</td>
+</tr>
+<tr>
+<td><code>n_cst_loansrv_allrequest</code></td>
+<td>-</td>
+<td>คำขอปรับปรุงสัญญาทุกประเภท</td>
+</tr>
+<tr>
+<td><code>n_cst_loansrv_lnright</code></td>
+<td>-</td>
+<td>คำนวณสิทธิ์/วงเงินกู้สูงสุด (ใหญ่สุดใน 6 service ย่อย)</td>
+</tr>
+<tr>
+<td><code>n_cst_deposit_loan_service</code></td>
+<td>466 ฟังก์ชัน (ใหญ่สุดทั้งระบบ)</td>
+<td>เป็น <strong>service เงินฝากเป็นหลัก</strong> เชื่อมกับเงินกู้เฉพาะจุดอายัด/ปลดอายัดเงินฝากเป็นหลักประกัน (<code>of_autosequest_loan</code>/<code>of_autodesequest_loan</code>)</td>
+</tr>
+<tr>
+<td><code>n_cst_loansrv_mobile</code></td>
+<td>218 ฟังก์ชัน (~150 ไม่ซ้ำ)</td>
+<td>Engine เดียวกับ desktop, มีเพียง 8 ฟังก์ชันต่อท้าย <code>_mobile</code> จริง ใช้เลขเอกสารชุด "OL" (online) แยกจากเคาน์เตอร์</td>
+</tr>
+<tr>
+<td><code>n_cst_loancoopsrv_lcoperate</code></td>
+<td>-</td>
+<td><strong>จุดเชื่อม (bridge)</strong> ระหว่างตาราง <code>lc*</code> (กู้ยืมระหว่างสหกรณ์) กับตาราง <code>ln*</code> ปกติ</td>
+</tr>
+<tr>
+<td><code>n_cst_lncoopsrv_mboperate</code> (ใน <code>lncoopsrv.pbl</code>)</td>
+<td>-</td>
+<td>จัดการข้อมูลกรรมการ/ธุรกิจประจำปีของสหกรณ์คู่สัญญา ยืนยันว่าโมดูลนี้คือ <strong>กู้ยืมระหว่างสหกรณ์ (คณะนิติบุคคล) ไม่ใช่รายบุคคล</strong></td>
+</tr>
+</tbody>
+</table>
+<h2>3. ขั้นตอนการประมวลผลอย่างละเอียด (Detailed Processing Steps)</h2>
+<h3>3.1 วงจรคำขอกู้ → อนุมัติ → เบิกจ่าย (Request → Approval → Disbursement)</h3>
+<ol>
+<li><strong>สมาชิกยื่นคำขอ</strong> — <code>ws_lon_reqloan_ctrl</code> (<code>PostMemberNo</code>) ไล่ตรวจสิทธิ์ 14 เงื่อนไข (สถานะสมาชิก/ใบคำขอค้าง/ผิดนัดชำระ/อายุ-งวดหุ้น/วงเงินรวม MAXALLLOAN_AMOUNT) → เรียก <code>wcf.NLoan.of_getcollpermiss</code> คำนวณวงเงินค้ำ + <code>LoanMasterClass.CalLoanCredit()</code> (ฝั่ง .NET ล้วน ไม่ผ่าน WCF) → บันทึก <code>LNREQLOAN</code> (status รออนุมัติ)</li>
+<li><strong>เจ้าหน้าที่อนุมัติ</strong> — <code>ws_lon_apvloan_ctrl</code> (<code>SaveWebSheet</code>) รวมแถวที่เลือกส่งเข้า <code>wcf.NLoan.of_saveapv_lnreq</code> ครั้งเดียวทั้งชุด → <code>of_gennewcontractno</code> ออกเลขสัญญา (<strong>coop 056001 มี flow เสริม 3 ขั้น: อัปเดตดอกเบี้ยหักกลับ + สร้างคำขอเปลี่ยนแผนประกัน + พิมพ์ใบสั่งจ่าย PDF เฉพาะสหกรณ์นี้</strong>)</li>
+<li><strong>เบิกจ่ายจริง</strong> — <code>ws_lon_post_loan_receive_ctrl</code> (<code>LoopSave</code>) ดึงรายการที่ยังไม่ผ่านรายการจาก <code>slslippayout</code> → เรียก <code>wcf.NLoan.of_saveslip_postlnrcv</code> (WCF sync) → update <code>slslippayout.lotpay_seqno</code> + <code>lnreqloan.loanrequest_status=1</code></li>
+<li><strong>[ทางเลือก] พิมพ์/ค้นหาก่อนเบิก</strong> — <code>ws_lon_rcvloan_ctrl</code> เป็นหน้าค้นหา+พิมพ์เท่านั้น (ไม่มีการบันทึก) การบันทึกจริงถ้าผ่านหน้านี้เกิดที่ dialog แยก <code>dlg/wd_lon_rcvlon_ctrl</code></li>
+</ol>
+<h3>3.2 วงจรรับชำระที่เคาน์เตอร์ (Payment)</h3>
+<ol>
+<li><code>ws_lon_payment_ctrl</code> (<code>PostMemberNo</code>) ตรวจ token กันทำซ้ำข้ามเครื่อง → ตรวจค้างชำระผ่าน <code>InitLnRcv()</code>/<code>InitLnRcvKeepArrear()</code> → คำนวณค่าปรับผิดนัดอัตโนมัติผ่าน <code>of_setloanfilepayment</code> → คำนวณดอกเบี้ยใหม่ผ่าน <code>ReCalint</code> (เช็ควันทำการ)</li>
+<li><code>SaveWebSheet</code> เรียก <code>wcf.NLoan.of_saveslip_payin</code> (<strong>synchronous, XML 5 ส่วน: head/share/loan/etc/expense</strong>) แบบ call-and-wait</li>
+<li>หลังบันทึกสำเร็จ ยิงต่อทันทีด้วย <code>WebUtil.runProcessingFin(state)</code> (<strong>asynchronous</strong>) เพื่อประมวลผลด้านการเงินที่ไม่ต้องรอผล — เป็นตัวอย่างเดียวในระบบที่ธุรกรรมเดียวใช้ <strong>ทั้ง sync และ async ต่อกัน</strong></li>
+<li>เงื่อนไขพิเศษ: coop 080001 ต้องเปิดวันทำการระบบการเงินก่อน, coop 050001 ห้ามแก้ยอดดอกเบี้ยที่ชำระ, AERO เพิ่มการตรวจสิทธิ์ซื้อหุ้นพิเศษ (<code>CheckBuySPX</code>)</li>
+</ol>
+<h3>3.3 วงจรปิดงวด/ตั้งยอดค้าง/NPL (Period-close &amp; Arrear)</h3>
+<ol>
+<li><code>ws_lon_clsmth_ctrl</code> (<code>Cls_Mth_Close</code>) → ยิง batch คู่กัน 2 งาน: <strong><code>LNCLOSEMONTH</code></strong> (→ <code>n_cst_proc_slcls.of_slcls_mth()</code>) และ <strong><code>LNCALINTARRNEW</code></strong> (→ <code>n_cst_proc_slcls.of_slcls_mth_genintarr_aero()</code> — เวอร์ชันเฉพาะ AERO)</li>
+<li><code>ws_lon_cls_process_setmb_npl_ctrl</code> (<code>JsPostProcessNPL</code>) → ยิง batch <strong><code>PROCSETARRMTHNPL</code></strong> (→ <code>n_cst_sl_mth_arrear_process.of_initservice()</code> + <code>of_procnpl()</code>) — ตั้งยอดค้างชำระ/สถานะ NPL ของสมาชิกทั้งหมดประจำงวด (<strong>หมายเหตุ: ฟังก์ชัน <code>OfCheckUseProcess</code> ที่ควรกันรันซ้ำถูกเตรียมไว้แต่ยังไม่ถูกเรียกใช้จริงในโค้ด — ความเสี่ยง</strong>)</li>
+<li><code>ws_lon_proc_prinarrear_aero_ctrl</code> (เฉพาะ AERO) คำนวณเบี้ยปรับเงินต้นค้างแบบ synchronous ล้วน (ไม่ผ่าน batch/WCF) ด้วย <strong>finerate hardcode 3.25%</strong> บันทึกเข้าโมดูล "เก็บเงินอื่นๆ" (<code>kprcvkeepother</code>)</li>
+<li><code>ws_lon_auditloan_ctrl</code> เป็นเครื่องมือแก้ไขค่า field สัญญาโดยตรงหลังตรวจสอบ (ไม่ใช่แค่รายงาน) — <strong>เฉพาะ coop 017001 เท่านั้นที่บันทึก audit log ทุกครั้งที่แก้ไข</strong> (<code>lnauditloanlog</code>)</li>
+</ol>
+<h3>3.4 วงจรดอกเบี้ยคืน (Interest/Money Return) — 2 ขั้นตอนต่อเนื่อง</h3>
+<ol>
+<li><strong>ขั้นตั้งยอด</strong> — <code>ws_lon_proc_moneyreturn_ctrl</code> reset <code>interest_return=0</code> (SQL ตรง) แล้วยิง batch <strong><code>PROCSETINTRETURNNOTPOST</code></strong> (→ <code>n_cst_proc_slmnyret.of_proc_setmnyreturn()</code>)</li>
+<li><strong>ขั้นจ่ายจริง</strong> — <code>ws_lon_proc_paymoneyreturn_ctrl</code> ยิง batch <strong><code>POSTINTRETPAYOUT_POSTSTM_SUMPAY</code></strong> (→ <code>of_post_toslippayout_sumpay()</code>) โพสต์ statement และสรุปยอดจ่ายในงานเดียว — ไฟล์ .NET นี้ไม่มี SQL ตรงเลย ตรรกะทั้งหมดฝากไว้ที่ batch job</li>
+<li><code>n_cst_proc_slmnyret</code> เป็น object ที่ถูกอ้างถึงมากที่สุดในระบบ dispatch (16/35 case) และมี branch ตาม coop_control ซ้อนอยู่ภายใน (<code>PROCSETINTRETURN</code>, <code>PROCSETLOANRETURN</code>)</li>
+</ol>
+<h2>4. การเชื่อมโยงและความสัมพันธ์ฟังก์ชันย่อย (Function Call Hierarchy)</h2>
+<pre><code>[ASP.NET .aspx.cs page]
+   │
+   ├─(รูปแบบ A: Synchronous)──▶ wcf.NLoan.* / wcf.NCommon.*  (namespace CoreSavingLibrary.WcfNLoan)
+   │                                 │
+   │                                 ▼
+   │                        PBService125 (loansrv.pbl)
+   │                        n_cst_loansrv_lnoperate  ──▶ inv_intsrv / inv_docsrv / inv_finsrv / inv_deptsrv / inv_calpeirod
+   │                                 │
+   │                                 ▼
+   │                              DB tables (ตรง, transaction เดียว, รอผลกลับทันที)
+   │
+   ├─(รูปแบบ B: Asynchronous / Batch Queue)──▶ WebUtil.runProcessing[Extend/CappExtend](state, &quot;PROC_NAME&quot;, xml)
+   │                                 │
+   │                                 ▼
+   │                        insert into cmprocessing (object_name, cmd, CRITERIA_XML, core_flag, ...)
+   │                                 │  (PBProcess.exe polling)
+   │                                 ▼
+   │                        n_cst_pbprocess_loan :: ue_pbprocess (pcloan.pbl)
+   │                        choose case upper(astr_process.proc_name)
+   │                                 │
+   │                                 ▼
+   │                        Worker object เช่น n_cst_proc_sltrnpayin
+   │                                 │  of_pginit(astr_process) → of_proc_trnpayin()
+   │                                 │  inv_dwxmliesrv.of_xmlimport(lds_option, istr_process.arg1)
+   │                                 │  (DataStore ผูกกับ d_loansrv_proc_trnpayin_opt)
+   │                                 ▼
+   │                              DB tables (batch, อาจ commit หลายจุด)
+   │
+   └─(รูปแบบ C: Direct SQL)──▶ ExecuteDataSource / WebUtil.QuerySdt / SQLFormat ──▶ DB tables โดยตรง (ไม่ผ่านทั้ง 2 ชั้น)
+</code></pre>
+<p><strong>ห่วงโซ่ real-evidence ที่ตรวจสอบแล้วครบวงจร (end-to-end) 1 เส้นทาง:</strong></p>
+<pre><code>ws_lon_prctrnpayin_ctrl.PostProc()
+  → WebUtil.runProcessingExtend(state, &quot;LNPOSTTRNPAYIN&quot;, xml, &quot;&quot;, &quot;&quot;, &quot;&quot;)
+      → insert cmprocessing (object_name=..., cmd=..., CRITERIA_XML=xml)
+          → PBProcess.exe อ่านคิว
+              → n_cst_pbprocess_loan.ue_pbprocess()
+                  → case &quot;LNPOSTTRNPAYIN&quot;:
+                      → n_cst_proc_sltrnpayin.of_pginit(astr_process)
+                      → n_cst_proc_sltrnpayin.of_proc_trnpayin()
+                          → inv_dwxmliesrv.of_xmlimport(lds_option, istr_process.arg1)   // แปลง XML criteria กลับเป็น DataStore
+                          → lds_option.dataobject = &quot;d_loansrv_proc_trnpayin_opt&quot;
+                          → is_source = lds_option.getitemstring(1,&quot;source_system&quot;)
+                          → (logic ต่อ: ดึง sltranspayin, สร้าง payinslip, of_postslip_payinloan, of_poststm_contract ...)
+</code></pre>
+<h2>5. ตารางฐานข้อมูลที่เกี่ยวข้อง (Database Tables)</h2>
+<table>
+<thead>
+<tr>
+<th>ตาราง</th>
+<th>บทบาท</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>lncontmaster</code></td>
+<td>ตารางหลักของสัญญาเงินกู้ (ยอดคงเหลือ ดอกเบี้ยค้าง สถานะ) — ถูก update จากแทบทุกโมดูล</td>
+</tr>
+<tr>
+<td><code>lncontstatement</code></td>
+<td>รายการเดินบัญชี (statement) ต่อสัญญา ใช้เป็นฐานคำนวณดอกเบี้ยและออกหนังสือรับรอง</td>
+</tr>
+<tr>
+<td><code>lncontperiodpaydet</code></td>
+<td>รายละเอียดการแบ่งชำระรายงวด (แก้ไขได้ผ่าน <code>ws_lon_auditloan_ctrl</code>)</td>
+</tr>
+<tr>
+<td><code>lnreqloan</code></td>
+<td>คำขอกู้ (สถานะ 0=รอ/1=อนุมัติ)</td>
+</tr>
+<tr>
+<td><code>lnreqloancredscroll</code></td>
+<td>คะแนนเครดิตประกอบคำขอกู้</td>
+</tr>
+<tr>
+<td><code>lnreqadjustcont</code> / <code>lnreqcompound</code></td>
+<td>คำขอปรับปรุงสัญญา/ทบต้น</td>
+</tr>
+<tr>
+<td><code>lnreqpauseloan</code> / <code>lnmembpauseloan</code></td>
+<td>คำขอ/รายการงดชำระ</td>
+</tr>
+<tr>
+<td><code>lncollmaster</code> / <code>lncollmastbuilding</code> / <code>lncollmastprop</code> / <code>lncollmastmemco</code></td>
+<td>หลักประกันอสังหาริมทรัพย์และรายละเอียดย่อย</td>
+</tr>
+<tr>
+<td><code>lncollcarmaster</code></td>
+<td>หลักประกันรถยนต์</td>
+</tr>
+<tr>
+<td><code>lnloantype</code> / <code>lnloantypecustom</code> / <code>lnloantyperightcoll</code> / <code>lnloantypecolluse</code></td>
+<td>ประเภทเงินกู้และเงื่อนไขย่อย (~15 ตารางลูก)</td>
+</tr>
+<tr>
+<td><code>lncfgrpgrtpermissdet</code> / <code>LNCFGRPGRTPERMLNTYPE</code></td>
+<td>กฎสิทธิ์ค้ำประกันกลุ่ม</td>
+</tr>
+<tr>
+<td><code>lnucfcredscoll</code></td>
+<td>เกณฑ์ให้คะแนนเครดิต</td>
+</tr>
+<tr>
+<td><code>lnauditloanlog</code></td>
+<td>audit log การแก้ไขสัญญา (เฉพาะ coop 017001)</td>
+</tr>
+<tr>
+<td><code>lnsumintcert</code></td>
+<td>สรุปดอกเบี้ยเพื่อออกหนังสือรับรองภาษี</td>
+</tr>
+<tr>
+<td><code>lnestloanpayment</code></td>
+<td>ตารางประมาณการชำระหนี้ (staging, จาก <code>ws_loan_contestpayment_ctrl</code>)</td>
+</tr>
+<tr>
+<td><code>slslippayout</code> / <code>slslippayoutdet</code></td>
+<td>ใบสำคัญจ่ายเบิกเงินกู้</td>
+</tr>
+<tr>
+<td><code>sltranspayin</code> / <code>sltranspayindet</code></td>
+<td>รายการนำเข้าชำระหนี้จากภายนอก (ก่อนโพสต์จริงผ่าน <code>LNPOSTTRNPAYIN</code>)</td>
+</tr>
+<tr>
+<td><code>slclsmthbalance</code></td>
+<td>ยอดคงเหลือ ณ ปิดเดือน (<code>bizz_system='LON'</code>)</td>
+</tr>
+<tr>
+<td><code>kprcvkeepother</code> / <code>kptempreceivedet</code></td>
+<td>เชื่อมกับโมดูล Keeping (เก็บเงินอื่นๆ/เบี้ยปรับ)</td>
+</tr>
+<tr>
+<td><code>lc*</code> (<code>lccontmaster</code>, <code>lcreqloan</code>, <code>lccontstatement</code>, <code>lcmembdetyearboard</code>, <code>lcmembdetyearbiz</code>)</td>
+<td>กู้ยืมระหว่างสหกรณ์ (<code>lncoopsrv.pbl</code>)</td>
+</tr>
+<tr>
+<td><code>cmprocessing</code></td>
+<td><strong>คิวงาน batch กลาง</strong> — คอลัมน์ <code>core_flag</code> (default 1, NOT NULL) กำหนดว่า job นี้วิ่งจาก CORE หรือ extend</td>
+</tr>
+<tr>
+<td><code>amsecwins</code></td>
+<td>ตารางสิทธิ์เมนู/หน้าจอ — คอลัมน์ <code>core_flag</code>, <code>win_parameter</code>, <code>open_type</code> กำหนดเส้นทาง URL ของแต่ละหน้าจอ (ดูหัวข้อ 1)</td>
+</tr>
+</tbody>
+</table>
+<h2>6. ตัวอย่าง Source Code จริงที่แนบประกอบ</h2>
+<h3>6.1 กลไก core_flag routing (<code>CoreSavingLibrary/MenuBar.cs</code>)</h3>
+<pre><code class="language-csharp">// บรรทัด 135
+decode(b.open_type, 3, savUrl3, decode(b.core_flag, 1, savUrl0, 3, savUrl0,
+  '_'||(case when b.win_parameter is not null then b.win_parameter else a.application end), savUrl1))
+  || '/GCOOP/Saving/Applications/' || ...
+
+// บรรทัด 211
+(case b.open_type when 3 then savUrl3 else
+  ( case b.core_flag when 1 then savUrl0 else savUrl1 end ) end)
+  || '/GCOOP/Saving/Applications/' || ...
+</code></pre>
+<h3>6.2 ตาราง dispatch เต็มของ <code>n_cst_pbprocess_loan::ue_pbprocess</code> (ย่อ)</h3>
+<pre><code class="language-powerscript">event ue_pbprocess;call super::ue_pbprocess;
+n_cst_proc_slcls          lnv_slcls
+n_cst_proc_lnshortlong    lnv_lnshtlong
+n_cst_proc_slmnyret       lnv_mnyret
+n_cst_proc_deposit        lnv_dpproc
+n_cst_sl_mth_arrear_process inv_mtharr
+
+choose case upper( astr_process.proc_name )
+    case &quot;LNCLOSEMONTH&quot;
+        lnv_slcls = create n_cst_proc_slcls
+        lnv_slcls.of_pginit( astr_process )
+        lnv_slcls.of_slcls_mth()
+    case &quot;PROCSETINTRETURN&quot;
+        lnv_mnyret = create n_cst_proc_slmnyret
+        lnv_mnyret.of_pginit( astr_process )
+        if gs_coopcontrol = '057001' then
+            lnv_mnyret.of_proc_mnyreturn_doae()
+        else
+            if gs_coopcontrol = '065001' or gs_coopcontrol = '060001' then
+                lnv_mnyret.of_proc_setmnyreturn()
+            else
+                lnv_mnyret.of_proc_mnyreturn()
+            end if
+        end if
+    case &quot;PROCSETARRMTHNPL&quot;
+        inv_mtharr = create n_cst_sl_mth_arrear_process
+        inv_mtharr.of_pginit( astr_process )
+        inv_mtharr.of_initservice()
+        inv_mtharr.of_procnpl()
+    case &quot;LNCALINTARRNEW&quot;
+        lnv_slcls = create n_cst_proc_slcls
+        lnv_slcls.of_pginit( astr_process )
+        lnv_slcls.of_slcls_mth_genintarr_aero()   // เวอร์ชันเฉพาะ AERO
+end choose
+end event
+</code></pre>
+<h3>6.3 <code>n_cst_proc_sltrnpayin::of_proc_trnpayin()</code> — จุดเริ่มรับ XML criteria จากฝั่ง .NET</h3>
+<pre><code class="language-powerscript">public function integer of_proc_trnpayin ();
+string  ls_refslipno, ls_slipno, ls_receiptno, ls_memgroup, ls_subgroup, ls_trnitemcode, ...
+n_ds    lds_option, lds_trnpayin, lds_payinslip, lds_payinslipdet, lds_infocont, lds_payinslipexp, lds_yrconstant
+
+lds_option = create n_ds
+lds_option.dataobject = &quot;d_loansrv_proc_trnpayin_opt&quot;
+ls_xmloption = istr_process.arg1        // XML criteria ที่ .NET ส่งมาผ่าน cmprocessing.CRITERIA_XML
+
+try
+    inv_dwxmliesrv.of_xmlimport( lds_option, ls_xmloption )   // แปลง XML → DataStore
+catch( exception lex_imp )
+    iex_exception.text = &quot;criteria &quot; + lex_imp.text
+    lb_err = true
+end try
+
+if lb_err then goto objdestroy
+
+is_source    = lds_option.getitemstring( 1, &quot;source_system&quot; )
+ldtm_trndate = lds_option.getitemdatetime( 1, &quot;trans_date&quot; )
+ls_entryid   = lds_option.getitemstring( 1, &quot;entry_id&quot; )
+// ... ดึงรายการ sltranspayin ต่อ แล้วสร้างใบนำฝาก (payinslip) และโพสต์เข้าสัญญาจริง
+// ผ่าน of_postslip_payinloan / of_poststm_contract
+</code></pre>
+<h3>6.4 ธุรกรรมรับชำระ — ฝั่ง .NET เรียก WCF synchronous (<code>ws_lon_payment.aspx.cs</code>)</h3>
+<pre><code class="language-csharp">// SaveWebSheet (ย่อ)
+wcf.NLoan.of_saveslip_payin(SsWsPass, SsCoopId, xmlHead, xmlShare, xmlLoan, xmlEtc, xmlExpense, SsCoopControl);
+// ต่อด้วย async batch สำหรับงานการเงินที่ไม่ต้องรอผล
+WebUtil.runProcessingFin(state);
+</code></pre>
+<h3>6.5 ตัวอย่าง diff ยืนยันว่า AERO เป็นการ fork จริง ไม่ใช่ symlink/สำเนา (<code>ws_lon_reqloan_ctrl</code>)</h3>
+<pre><code>CORE: ws_lon_reqloan.aspx.cs  = 2,799 บรรทัด
+AERO: ws_lon_reqloan.aspx.cs  = 3,909 บรรทัด   (+1,110 บรรทัด, diff 2,106 บรรทัดเปลี่ยนแปลง)
+→ AERO เพิ่ม logic ใหม่จริง (เช่น PostChgBuyIns สำหรับ coop 069001) ไม่ใช่แค่ format ต่างกัน
+
+ข้อยกเว้นเดียว: ws_lon_cls_process_setmb_npl_ctrl
+CORE = 188 บรรทัด, AERO = 188 บรรทัด, diff = 0 บรรทัด  (ไฟล์เหมือนกันทุกตัวอักษร)
+</code></pre>
+<h2>7. สรุปข้อจำกัดของการวิเคราะห์ (Methodology Note)</h2>
+<ul>
+<li>การวิเคราะห์นี้อ่านจาก <strong>source code ที่มีอยู่ในเครื่อง</strong> (ASP.NET <code>.aspx.cs</code> แบบ uncompiled อ่านได้เต็ม 100%, PowerBuilder <code>.pbl</code> แบบ compiled ใช้ <code>strings -e l</code> แกะ UTF-16LE ซึ่งอาจมีบาง function body คลาดเคลื่อนจากขอบเขต object ที่ประกาศไว้ เหมือนที่เคยพบใน <code>pckeeping.pbl</code>)</li>
+<li>ค่า <code>amsecwins.core_flag</code> จริงเป็น <strong>runtime configuration ต่อสหกรณ์</strong> ไม่มีอยู่ใน source tree ที่ตรวจสอบได้ในเซสชันนี้ — ข้อสรุปเรื่อง "หน้าไหนใช้ CORE หรือ AERO" ในเอกสารนี้อ้างอิงจาก <strong>การมีอยู่ของไฟล์และผลต่างของเนื้อโค้ด</strong> เป็นหลักฐานทางอ้อม ไม่ใช่ค่า core_flag ที่ยืนยันจากฐานข้อมูลจริง</li>
+<li>หน้าจอ CORE-only 118 หน้าในหัวข้อ 2.1.2 จัดหมวดจาก naming convention เป็นหลัก (🟡) ยังไม่ได้อ่าน source ทีละบรรทัดครบทุกหน้า — สามารถขอเจาะลึกเพิ่มเติมเป็นรายหน้าหรือรายหมวดได้ในคำขอถัดไป</li>
+</ul>
+</div>
+</body>
+</html>
